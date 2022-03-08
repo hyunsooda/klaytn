@@ -23,6 +23,8 @@ package contracts
 //go:generate abigen --sol ./sc_erc721_no_uri/sc_nft_no_uri.sol --pkg scnft_no_uri --out ./sc_erc721_no_uri/sc_nft_no_uri.go
 
 //go:generate abigen --sol ./sc_erc20/sc_token.sol --pkg sctoken --out ./sc_erc20/sc_token.go
+//go:generate abigen --sol ./sc_kip7/sc_token.sol --pkg sctoken --out ./sc_kip7/sc_token.go
+//go:generate abigen --sol ./sc_kip17/sc_nft.sol --pkg sctoken --out ./sc_kip17/sc_nft.go
 
 //go:generate abigen --sol ./kip13/InterfaceIdentifier.sol --pkg kip13 --out ./kip13/InterfaceIdentifier.go
 
