@@ -20,6 +20,9 @@ import "../externals/openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 import "../externals/openzeppelin-solidity/contracts/token/ERC20/ERC20Mintable.sol";
 import "../externals/openzeppelin-solidity/contracts/math/SafeMath.sol";
 
+import "../kip7/IKIP7.sol";
+import "../kip7/KIP7Mintable.sol";
+
 
 contract BridgeFee {
     using SafeMath for uint256;
@@ -27,9 +30,11 @@ contract BridgeFee {
     address payable public feeReceiver = address(0);
     uint256 public feeOfKLAY = 0;
     mapping (address => uint256) public feeOfERC20;
+    mapping (address => uint256) public feeOfKIP7;
 
     event KLAYFeeChanged(uint256 indexed fee);
     event ERC20FeeChanged(address indexed token, uint256 indexed fee);
+    event KIP7FeeChanged(address indexed token, uint256 indexed fee);
     event FeeReceiverChanged(address indexed feeReceiver);
 
     constructor(address payable _feeReceiver) internal {
@@ -68,6 +73,22 @@ contract BridgeFee {
         return 0;
     }
 
+    function _payKIP7FeeAndRefundChange(address from, address _token, uint256 _feeLimit) internal returns(uint256) {
+        uint256 fee = feeOfKIP7[_token];
+
+        if (feeReceiver != address(0) && fee > 0) {
+            require(_feeLimit >= fee, "insufficient feeLimit");
+
+            IKIP7(_token).transfer(feeReceiver, fee);
+            IKIP7(_token).transfer(from, _feeLimit.sub(fee));
+
+            return fee;
+        }
+
+        IKIP7(_token).transfer(from, _feeLimit);
+        return 0;
+    }
+
     function _setKLAYFee(uint256 _fee) internal {
         feeOfKLAY = _fee;
         emit KLAYFeeChanged(_fee);
@@ -76,6 +97,11 @@ contract BridgeFee {
     function _setERC20Fee(address _token, uint256 _fee) internal {
         feeOfERC20[_token] = _fee;
         emit ERC20FeeChanged(_token, _fee);
+    }
+
+    function _setKIP7Fee(address _token, uint256 _fee) internal {
+        feeOfKIP7[_token] = _fee;
+        emit KIP7FeeChanged(_token, _fee);
     }
 
     function _setFeeReceiver(address payable _to) internal {

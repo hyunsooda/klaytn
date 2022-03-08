@@ -38,7 +38,9 @@ contract BridgeTransfer is BridgeHandledRequests, BridgeFee, BridgeOperator {
     enum TokenType {
         KLAY,
         ERC20,
-        ERC721
+        ERC721,
+        KIP7,
+        KIP17
     }
 
     constructor(bool _modeMintBurn) BridgeFee(address(0)) internal {
