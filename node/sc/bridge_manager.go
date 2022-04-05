@@ -30,7 +30,8 @@ import (
 	"github.com/klaytn/klaytn/blockchain/vm"
 	"github.com/klaytn/klaytn/common"
 	bridgecontract "github.com/klaytn/klaytn/contracts/bridge"
-	scnft "github.com/klaytn/klaytn/contracts/sc_erc721"
+	erc721binding "github.com/klaytn/klaytn/contracts/sc_erc721"
+	kip17binding "github.com/klaytn/klaytn/contracts/sc_kip17"
 	"github.com/klaytn/klaytn/event"
 	"github.com/klaytn/klaytn/node/sc/bridgepool"
 	"github.com/klaytn/klaytn/rlp"
@@ -49,6 +50,8 @@ const (
 	KLAY uint8 = iota
 	ERC20
 	ERC721
+	KIP7
+	KIP17
 )
 
 const (
@@ -316,10 +319,17 @@ func (bi *BridgeInfo) handleRequestValueTransferEvent(ev *RequestValueTransferEv
 			return err
 		}
 		logger.Trace("Bridge succeeded to HandleERC20Transfer", "nonce", ev.RequestNonce, "tx", handleTx.Hash().String())
+	case KIP7:
+		handleTx, err = bi.bridge.HandleKIP7Transfer(auth, ev.Raw.TxHash, ev.From, ev.To, tokenAddr, ev.ValueOrTokenId, ev.RequestNonce, ev.Raw.BlockNumber, ev.ExtraData)
+		if err != nil {
+			return err
+		}
+		logger.Trace("Bridge succeeded to HandleKIP7Transfer", "nonce", ev.RequestNonce, "tx", handleTx.Hash().String())
 	case ERC721:
+		// TODO: Grab a fix from #1239.
 		// get URI of the ERC721
 		var uri string
-		erc721, err := scnft.NewERC721Metadata(ev.TokenAddress, bi.counterpartBackend)
+		erc721, err := erc721binding.NewERC721Metadata(ev.TokenAddress, bi.counterpartBackend)
 		if err != nil {
 			return err
 		}
@@ -338,6 +348,29 @@ func (bi *BridgeInfo) handleRequestValueTransferEvent(ev *RequestValueTransferEv
 			return err
 		}
 		logger.Trace("Bridge succeeded to HandleERC721Transfer", "nonce", ev.RequestNonce, "tx", handleTx.Hash().String())
+	case KIP17:
+		// get URI of the KIP17
+		// TODO: Grab a fix from #1239.
+		var uri string
+		kip17, err := kip17binding.NewKIP17Metadata(ev.TokenAddress, bi.counterpartBackend)
+		if err != nil {
+			return err
+		}
+
+		uri, err = kip17.TokenURI(nil, ev.ValueOrTokenId)
+		if err != nil {
+			if err.Error() == vm.ErrExecutionReverted.Error() {
+				logger.Debug("Unable to get an KIP17 URI", "kip17", ev.TokenAddress.String(), "onParent", bi.onChildChain, "tokenId", ev.ValueOrTokenId.String())
+			} else {
+				return err
+			}
+		}
+
+		handleTx, err = bi.bridge.HandleKIP17Transfer(auth, ev.Raw.TxHash, ev.From, ev.To, tokenAddr, ev.ValueOrTokenId, ev.RequestNonce, ev.Raw.BlockNumber, uri, ev.ExtraData)
+		if err != nil {
+			return err
+		}
+		logger.Trace("Bridge succeeded to HandleKIP17Transfer", "nonce", ev.RequestNonce, "tx", handleTx.Hash().String())
 	default:
 		logger.Error("Got Unknown Token Type ReceivedEvent", "bridge", ev.Raw.Address, "nonce", ev.RequestNonce, "from", ev.From)
 		return nil
