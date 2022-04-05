@@ -31,14 +31,14 @@ contract ERC20ServiceChain is ERC20, Ownable {
     address public bridge;
 
     constructor(address _bridge) internal {
+        setBridge(_bridge);
+    }
+
+    function setBridge(address _bridge) public onlyOwner {
         if (!_bridge.isContract()) {
             revert("bridge is not a contract");
         }
 
-        bridge = _bridge;
-    }
-
-    function setBridge(address _bridge) public onlyOwner {
         bridge = _bridge;
     }
 
