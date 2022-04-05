@@ -85,7 +85,7 @@ contract BridgeFee {
 
             require(IKIP7(_token).transfer(feeReceiver, fee), "_payKIP7FeeAndRefundChange: transfer failed");
             if (_feeLimit.sub(fee) > 0) {
-                require(IKIP17(_token).transfer(from, _feeLimit.sub(fee)), "_payKIP7FeeAndRefundChange: transfer failed");
+                require(IKIP7(_token).transfer(from, _feeLimit.sub(fee)), "_payKIP7FeeAndRefundChange: transfer failed");
             }
 
             return fee;
