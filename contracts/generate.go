@@ -24,6 +24,12 @@ package contracts
 
 //go:generate abigen --sol ./sc_erc20/sc_token.sol --pkg sctoken --out ./sc_erc20/sc_token.go
 
+//go:generate abigen --sol ./sc_interfaceid_test/bridges/support_all_bridge/Bridge.sol --pkg bridge --out ./sc_interfaceid_test/bridges/support_all_bridge/Bridge.go
+//go:generate abigen --sol ./sc_interfaceid_test/bridges/support_only_erc20_bridge/Bridge.sol --pkg bridge --out ./sc_interfaceid_test/bridges/support_only_erc20_bridge/Bridge.go
+//go:generate abigen --sol ./sc_interfaceid_test/bridges/support_only_erc721_bridge/Bridge.sol --pkg bridge --out ./sc_interfaceid_test/bridges/support_only_erc721_bridge/Bridge.go
+//go:generate abigen --sol ./sc_interfaceid_test/bridges/no_support_any_bridge/Bridge.sol --pkg bridge --out ./sc_interfaceid_test/bridges/no_support_any_bridge/Bridge.go
+//go:generate abigen --sol ./sc_interfaceid_test/bridges/incorrect_event_signature/Bridge.sol --pkg bridge --out ./sc_interfaceid_test/bridges/incorrect_event_signature//Bridge.go
+
 //go:generate abigen --sol ./kip13/InterfaceIdentifier.sol --pkg kip13 --out ./kip13/InterfaceIdentifier.go
 
 //`credit.sol` was compiled by solidity@0.4.24.
