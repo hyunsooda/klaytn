@@ -25,6 +25,10 @@ import "./BridgeCounterPart.sol";
 contract Bridge is BridgeCounterPart, BridgeTransferKLAY, BridgeTransferERC20, BridgeTransferERC721 {
     uint64 public constant VERSION = 1;
 
-    constructor(bool _modeMintBurn) BridgeTransfer(_modeMintBurn) public payable {
+    constructor(bool _modeMintBurn) 
+        BridgeTransfer(_modeMintBurn)
+        BridgeTransferKLAY()
+        BridgeTransferERC20()
+        BridgeTransferERC721() public payable {
     }
 }
