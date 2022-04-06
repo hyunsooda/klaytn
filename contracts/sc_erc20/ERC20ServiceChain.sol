@@ -20,7 +20,7 @@ import "../externals/openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 import "../externals/openzeppelin-solidity/contracts/utils/Address.sol";
 import "../externals/openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "./IERC20BridgeReceiver.sol";
-
+import "../bridge/Bridge.sol";
 
 /**
  * @title ERC20ServiceChain
@@ -30,15 +30,29 @@ contract ERC20ServiceChain is ERC20, Ownable {
     using Address for address;
     address public bridge;
 
-    constructor(address _bridge) internal {
-        if (!_bridge.isContract()) {
-            revert("bridge is not a contract");
-        }
+    // Pre-calculated interface ID
+    bytes4 private constant _BRIDGE_TRANSFER_INTERFACE_ID = 0x00000001;
+    bytes4 private constant _BRIDGE_TRANSFER_KALY_INTERFACE_ID = 0x00000002;
+    bytes4 private constant _BRIDGE_TRANSFER_ERC20_INTERFACE_ID = 0x00000003;
+    bytes4 private constant _BRIDGE_TRANSFER_ERC721_INTERFACE_ID = 0x00000004;
 
-        bridge = _bridge;
+    constructor(address _bridge) internal {
+        setBridge(_bridge); 
+    }
+
+    function supportsBridgeInterface (address _bridge) internal {
+        Bridge bridge = Bridge(address(uint160(_bridge)));
+        require( 
+            bridge.supportsInterface(_BRIDGE_TRANSFER_INTERFACE_ID) &&
+            bridge.supportsInterface(_BRIDGE_TRANSFER_ERC20_INTERFACE_ID),
+            "Not a satisfied bridge contract");
     }
 
     function setBridge(address _bridge) public onlyOwner {
+        if (!_bridge.isContract()) {
+            revert("bridge is not a contract");
+        }
+        supportsBridgeInterface(_bridge);
         bridge = _bridge;
     }
 
