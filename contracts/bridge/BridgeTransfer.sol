@@ -22,8 +22,11 @@ import "./BridgeHandledRequests.sol";
 import "./BridgeFee.sol";
 import "./BridgeOperator.sol";
 import "./BridgeTokens.sol";
+import "../kip13/KIP13.sol";
 
-contract BridgeTransfer is BridgeHandledRequests, BridgeFee, BridgeOperator {
+contract BridgeTransfer is BridgeHandledRequests, BridgeFee, BridgeOperator, KIP13 {
+    bytes4 private constant _INTERFACE_ID = 0x00000001;
+
     bool public modeMintBurn = false;
     bool public isRunning = true;
 
@@ -42,6 +45,7 @@ contract BridgeTransfer is BridgeHandledRequests, BridgeFee, BridgeOperator {
     }
 
     constructor(bool _modeMintBurn) BridgeFee(address(0)) internal {
+        _registerInterface(_INTERFACE_ID);
         modeMintBurn = _modeMintBurn;
     }
 

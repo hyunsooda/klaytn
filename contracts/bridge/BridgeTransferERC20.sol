@@ -25,6 +25,12 @@ import "./BridgeTransfer.sol";
 
 
 contract BridgeTransferERC20 is BridgeTokens, IERC20BridgeReceiver, BridgeTransfer {
+    bytes4 private constant _INTERFACE_ID = 0x00000002;
+
+    constructor() internal {
+        _registerInterface(_INTERFACE_ID);
+    }
+
     // handleERC20Transfer sends the token by the request.
     function handleERC20Transfer(
         bytes32 _requestTxHash,

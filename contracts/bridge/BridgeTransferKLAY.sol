@@ -20,6 +20,7 @@ import "./BridgeTransfer.sol";
 
 
 contract BridgeTransferKLAY is BridgeTransfer {
+    bytes4 private constant _INTERFACE_ID = 0x00000004;
     bool public isLockedKLAY;
 
     event KLAYLocked();
@@ -33,6 +34,10 @@ contract BridgeTransferKLAY is BridgeTransfer {
     modifier unlockedKLAY {
         require(isLockedKLAY == false, "locked");
         _;
+    }
+
+    constructor() internal {
+        _registerInterface(_INTERFACE_ID);
     }
 
     // lockKLAY can to prevent request KLAY transferring.

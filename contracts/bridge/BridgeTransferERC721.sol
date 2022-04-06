@@ -25,6 +25,12 @@ import "./BridgeTransfer.sol";
 
 
 contract BridgeTransferERC721 is BridgeTokens, IERC721BridgeReceiver, BridgeTransfer {
+    bytes4 private constant _INTERFACE_ID = 0x00000003;
+
+    constructor() internal {
+        _registerInterface(_INTERFACE_ID);
+    }
+
     // handleERC721Transfer sends the ERC721 by the request.
     function handleERC721Transfer(
         bytes32 _requestTxHash,
