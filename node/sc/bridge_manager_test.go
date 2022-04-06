@@ -41,11 +41,17 @@ import (
 	sctoken "github.com/klaytn/klaytn/contracts/sc_erc20"
 	scnft "github.com/klaytn/klaytn/contracts/sc_erc721"
 	scnft_no_uri "github.com/klaytn/klaytn/contracts/sc_erc721_no_uri"
+	testincorrecteventsig "github.com/klaytn/klaytn/contracts/sc_interfaceid_test/bridges/incorrect_event_signature"
+	testnosupportany "github.com/klaytn/klaytn/contracts/sc_interfaceid_test/bridges/no_support_any_bridge"
+	testallbridge "github.com/klaytn/klaytn/contracts/sc_interfaceid_test/bridges/support_all_bridge"
+	testonlyerc20bridge "github.com/klaytn/klaytn/contracts/sc_interfaceid_test/bridges/support_only_erc20_bridge"
+	testonlyerc721bridge "github.com/klaytn/klaytn/contracts/sc_interfaceid_test/bridges/support_only_erc721_bridge"
 	"github.com/klaytn/klaytn/crypto"
 	"github.com/klaytn/klaytn/node/sc/bridgepool"
 	"github.com/klaytn/klaytn/params"
 	"github.com/klaytn/klaytn/rlp"
 	"github.com/klaytn/klaytn/storage/database"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -73,6 +79,186 @@ func CheckReceipt(b bind.DeployBackend, tx *types.Transaction, duration time.Dur
 	receipt, err := bind.WaitMined(timeoutContext, b, tx)
 	assert.Equal(t, nil, err)
 	assert.Equal(t, expectedStatus, receipt.Status)
+}
+
+// TestBridgeInterface tests whether a bridge contract implements expected interface
+// when a token contract is deployed.
+func TestBridgeInterface(t *testing.T) {
+	tempDir, err := ioutil.TempDir(os.TempDir(), "sc")
+	assert.NoError(t, err)
+	defer func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Fatalf("fail to delete file %v", err)
+		}
+	}()
+
+	// Generate a new random account and a funded simulator
+	aliceKey, _ := crypto.GenerateKey()
+	alice := bind.NewKeyedTransactor(aliceKey)
+
+	sim, bm := setupSim(t, tempDir, alice)
+	defer sim.Close()
+
+	auth := bm.subBridge.bridgeAccounts.pAccount.GenerateTransactOpts()
+
+	sim.Commit()
+	{
+		// Case 1 - Success (matched interface ID)
+		// Deploy Bridge Contract
+		addr, err := bm.deployCustomBridge(sim, "ALL")
+		if err != nil {
+			log.Fatalf("Failed to deploy new bridge contract: %v", err)
+		}
+		sim.Commit() // block
+
+		// Deploy Token Contract
+		_, tx, _, err := sctoken.DeployServiceChainToken(alice, sim, addr)
+		assert.NoError(t, err)
+		sim.Commit()
+		CheckReceipt(sim, tx, 1*time.Second, types.ReceiptStatusSuccessful, t)
+
+		// Deploy NFT Contract
+		_, tx, _, err = scnft.DeployServiceChainNFT(alice, sim, addr)
+		assert.NoError(t, err)
+		sim.Commit()
+		CheckReceipt(sim, tx, 1*time.Second, types.ReceiptStatusSuccessful, t)
+	}
+
+	{
+		// Case 2 - Success (matched interfaceID that implements ERC-20 transfer)
+		addr, err := bm.deployCustomBridge(sim, "ERC20")
+		assert.NoError(t, err)
+		sim.Commit()
+		_, tx, _, err := sctoken.DeployServiceChainToken(alice, sim, addr)
+		assert.NoError(t, err)
+		sim.Commit()
+		CheckReceipt(sim, tx, 1*time.Second, types.ReceiptStatusSuccessful, t)
+	}
+
+	{
+		// Case 3 - Success (matched interfaceID that implements ERC-721 transfer)
+		addr, err := bm.deployCustomBridge(sim, "ERC721")
+		assert.NoError(t, err)
+		sim.Commit()
+		_, tx, _, err := scnft.DeployServiceChainNFT(alice, sim, addr)
+		assert.NoError(t, err)
+		sim.Commit()
+		CheckReceipt(sim, tx, 1*time.Second, types.ReceiptStatusSuccessful, t)
+	}
+
+	{
+		// Case 4 - Failure (not matched interfaceID that implements ERC-20 transfer)
+		addr, err := bm.deployCustomBridge(sim, "ERC20")
+		assert.NoError(t, err)
+		sim.Commit()
+		_, _, _, err = scnft.DeployServiceChainNFT(alice, sim, addr)
+		assert.NotNil(t, err)
+		sim.Commit()
+	}
+
+	{
+		// Case 5 - Failure (not matched interfaceID that implements ERC-721 transfer)
+		addr, err := bm.deployCustomBridge(sim, "ERC721")
+		assert.NoError(t, err)
+		sim.Commit()
+		_, _, _, err = sctoken.DeployServiceChainToken(alice, sim, addr)
+		assert.NotNil(t, err)
+		sim.Commit()
+	}
+
+	{
+		// Case 6 - Failure (Call `setbridge()` function to ERC-20 token contract with not a satisfied bridge parameter)
+		addr, err := bm.deployCustomBridge(sim, "ERC20")
+		assert.NoError(t, err)
+		sim.Commit()
+		_, tx, erc20token, err := sctoken.DeployServiceChainToken(auth, sim, addr)
+		assert.NoError(t, err)
+		sim.Commit()
+		CheckReceipt(sim, tx, 1*time.Second, types.ReceiptStatusSuccessful, t)
+
+		// call `setbridge()`
+		erc721bridgeaddr, err := bm.deployCustomBridge(sim, "ERC721")
+		assert.NoError(t, err)
+		sim.Commit()
+
+		tx, _ = erc20token.SetBridge(auth, erc721bridgeaddr)
+		sim.Commit()
+		CheckReceipt(sim, tx, 1*time.Second, types.ReceiptStatusErrExecutionReverted, t)
+	}
+
+	{
+		// Case 7 - Failure (Call `setbridge()` function to ERC-721 token contract with not a satisfied bridge parameter)
+		addr, err := bm.deployCustomBridge(sim, "ERC721")
+		assert.NoError(t, err)
+		sim.Commit()
+		_, tx, erc721Token, err := scnft.DeployServiceChainNFT(auth, sim, addr)
+		assert.NoError(t, err)
+		sim.Commit()
+		CheckReceipt(sim, tx, 1*time.Second, types.ReceiptStatusSuccessful, t)
+
+		// call `setbridge()`
+		erc20BridgeAddr, err := bm.deployCustomBridge(sim, "ERC20")
+		assert.NoError(t, err)
+		sim.Commit()
+
+		tx, _ = erc721Token.SetBridge(auth, erc20BridgeAddr)
+		sim.Commit()
+		CheckReceipt(sim, tx, 1*time.Second, types.ReceiptStatusErrExecutionReverted, t)
+	}
+
+	{
+		// Case 8 - Success (Call `setbridge()` function to ERC-20 token contract with a satisfied bridge parameter)
+		addr, err := bm.deployCustomBridge(sim, "ERC20")
+		assert.NoError(t, err)
+		sim.Commit()
+		_, tx, erc20token, err := sctoken.DeployServiceChainToken(auth, sim, addr)
+		assert.NoError(t, err)
+		sim.Commit()
+		CheckReceipt(sim, tx, 1*time.Second, types.ReceiptStatusSuccessful, t)
+
+		allBridgeAddr, err := bm.deployCustomBridge(sim, "ALL")
+		assert.NoError(t, err)
+		sim.Commit()
+
+		anotherERC20Token, err := bm.deployCustomBridge(sim, "ERC20")
+		assert.NoError(t, err)
+		sim.Commit()
+
+		tx, _ = erc20token.SetBridge(auth, allBridgeAddr)
+		sim.Commit()
+		CheckReceipt(sim, tx, 1*time.Second, types.ReceiptStatusSuccessful, t)
+		tx, _ = erc20token.SetBridge(auth, anotherERC20Token)
+		sim.Commit()
+		CheckReceipt(sim, tx, 1*time.Second, types.ReceiptStatusSuccessful, t)
+	}
+
+	{
+		// Case 9 - Failure (Call `setbridge()` function to ERC-20 token contract with a satisfied bridge parameter)
+		addr, err := bm.deployCustomBridge(sim, "ALL")
+		assert.NoError(t, err)
+		sim.Commit()
+		_, _, erc20token, err := sctoken.DeployServiceChainToken(alice, sim, addr)
+		assert.NoError(t, err)
+		sim.Commit()
+
+		// call `setbridge()`
+		noBridgeAddr, err := bm.deployCustomBridge(sim, "NOALL")
+		assert.NoError(t, err)
+		sim.Commit()
+
+		tx, _ := erc20token.SetBridge(auth, noBridgeAddr)
+		sim.Commit()
+		CheckReceipt(sim, tx, 1*time.Second, types.ReceiptStatusErrExecutionReverted, t)
+	}
+
+	{
+		// Case 9 - Failure (Call `setbridge()` function to ERC-20 token contract with a satisfied bridge parameter)
+		addr, err := bm.deployCustomBridge(sim, "INCORRECT_EVENT_SIG")
+		assert.NoError(t, err)
+		sim.Commit()
+		_, _, _, err = sctoken.DeployServiceChainToken(alice, sim, addr)
+		assert.NotNil(t, err)
+	}
 }
 
 // TestBridgeManager tests the event/method of Token/NFT/Bridge contracts.
@@ -1985,6 +2171,101 @@ func TestDecodingLegacyAnchoringTx(t *testing.T) {
 	decodedData, err := types.DecodeAnchoringData(data)
 	assert.Equal(t, curBlk.Hash(), decodedData.GetBlockHash())
 	assert.Equal(t, curBlk.Header().Number.String(), decodedData.GetBlockNumber().String())
+}
+
+// deployCustomBridge deploys custom bridge to test bridge ineterfaceid check.
+func (bm *BridgeManager) deployCustomBridge(backend *backends.SimulatedBackend, contractTyp string) (common.Address, error) {
+	acc := bm.subBridge.bridgeAccounts.pAccount
+
+	pendingBlock := backend.PendingBlock()
+	go func() {
+		for pendingBlock == backend.PendingBlock() {
+			time.Sleep(100 * time.Millisecond)
+		}
+		backend.Commit()
+		return
+	}()
+
+	auth := acc.GenerateTransactOpts()
+
+	// Deploy a bridge contract
+	var (
+		tx  *types.Transaction
+		err error
+	)
+	switch contractTyp {
+	case "ALL":
+		_, tx, _, err = testallbridge.DeployBridge(auth, backend, false)
+		break
+	case "ERC20":
+		_, tx, _, err = testonlyerc20bridge.DeployBridge(auth, backend, false)
+		break
+	case "ERC721":
+		_, tx, _, err = testonlyerc721bridge.DeployBridge(auth, backend, false)
+	case "NOALL":
+		_, tx, _, err = testnosupportany.DeployBridge(auth, backend, false)
+		break
+	case "INCORRECT_EVENT_SIG":
+		_, tx, _, err = testincorrecteventsig.DeployBridge(auth, backend, false)
+		break
+	default:
+		return common.Address{}, errors.New("Unknown type")
+	}
+	if err != nil {
+		return common.Address{}, err
+	}
+	acc.IncNonce()
+
+	_b := bind.ContractBackend(backend)
+	back, ok := _b.(bind.DeployBackend)
+	if !ok {
+		return common.Address{}, errors.New("Backend type assertion failed")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	addr, err := bind.WaitDeployed(ctx, back, tx)
+	if err != nil {
+		return common.Address{}, err
+	}
+	return addr, err
+}
+
+func setupSim(t *testing.T, tempDir string, alice *bind.TransactOpts) (*backends.SimulatedBackend, *BridgeManager) {
+	// Config Bridge Account Manager
+	config := &SCConfig{}
+	config.DataDir = tempDir
+	bacc, _ := NewBridgeAccounts(nil, config.DataDir, database.NewDBManager(&database.DBConfig{DBType: database.MemoryDB}))
+	bacc.pAccount.chainID = big.NewInt(0)
+	bacc.cAccount.chainID = big.NewInt(0)
+
+	// Create Simulated backend
+	alloc := blockchain.GenesisAlloc{
+		alice.From:            {Balance: big.NewInt(params.KLAY)},
+		bacc.pAccount.address: {Balance: big.NewInt(params.KLAY)},
+		bacc.cAccount.address: {Balance: big.NewInt(params.KLAY)},
+	}
+	sim := backends.NewSimulatedBackend(alloc)
+
+	sc := &SubBridge{
+		chainDB:        database.NewDBManager(&database.DBConfig{DBType: database.MemoryDB}),
+		config:         config,
+		peers:          newBridgePeerSet(),
+		bridgeAccounts: bacc,
+		localBackend:   sim,
+		remoteBackend:  sim,
+	}
+	var err error
+	sc.handler, err = NewSubBridgeHandler(sc)
+	if err != nil {
+		t.Fatalf("Failed to initialize bridgeHandler : %v", err)
+	}
+
+	bm, err := NewBridgeManager(sc)
+	if err != nil {
+		t.Fatalf("Failed to create bridge manager")
+	}
+	return sim, bm
 }
 
 // DeployBridgeTest is a test-only function which deploys a bridge contract with some amount of KLAY.
