@@ -31,6 +31,7 @@ var Modules = map[string]string{
 	"istanbul":         Istanbul_JS,
 	"mainbridge":       MainBridge_JS,
 	"subbridge":        SubBridge_JS,
+	"subbridgeAdmin":   SubBridgeAdmin_JS,
 	"clique":           CliqueJs,
 	"governance":       Governance_JS,
 	"bootnode":         Bootnode_JS,
@@ -1236,16 +1237,6 @@ web3._extend({
 	methods:
 	[
 		new web3._extend.Method({
-			name: 'addPeer',
-			call: 'subbridge_addPeer',
-			params: 1
-		}),
-		new web3._extend.Method({
-			name: 'removePeer',
-			call: 'subbridge_removePeer',
-			params: 1
-		}),
-		new web3._extend.Method({
 			name: 'getReceiptFromParentChain',
 			call: 'subbridge_getReceiptFromParentChain',
 			params: 1
@@ -1256,11 +1247,6 @@ web3._extend({
 			params: 1
 		}),
 		new web3._extend.Method({
-			name: 'registerOperator',
-			call: 'subbridge_registerOperator',
-			params: 2
-		}),
-		new web3._extend.Method({
 			name: 'getOperators',
 			call: 'subbridge_getRegisteredOperators',
 			params: 1
@@ -1269,56 +1255,6 @@ web3._extend({
 			name: 'getValueTransferOperatorThreshold',
 			call: 'subbridge_getValueTransferOperatorThreshold',
 			params: 1
-		}),
-		new web3._extend.Method({
-			name: 'setValueTransferOperatorThreshold',
-			call: 'subbridge_setValueTransferOperatorThreshold',
-			params: 2
-		}),
-		new web3._extend.Method({
-			name: 'deployBridge',
-			call: 'subbridge_deployBridge',
-			params: 0
-		}),
-		new web3._extend.Method({
-			name: 'subscribeBridge',
-			call: 'subbridge_subscribeBridge',
-			params: 2
-		}),
-		new web3._extend.Method({
-			name: 'unsubscribeBridge',
-			call: 'subbridge_unsubscribeBridge',
-			params: 2
-		}),
-		new web3._extend.Method({
-			name: 'KASAnchor',
-			call: 'subbridge_kASAnchor',
-			params: 1
-		}),
-		new web3._extend.Method({
-			name: 'anchoring',
-			call: 'subbridge_anchoring',
-			params: 1
-		}),
-		new web3._extend.Method({
-			name: 'registerBridge',
-			call: 'subbridge_registerBridge',
-			params: 2
-		}),
-		new web3._extend.Method({
-			name: 'deregisterBridge',
-			call: 'subbridge_deregisterBridge',
-			params: 2
-		}),
-		new web3._extend.Method({
-			name: 'registerToken',
-			call: 'subbridge_registerToken',
-			params: 4
-		}),
-		new web3._extend.Method({
-			name: 'deregisterToken',
-			call: 'subbridge_deregisterToken',
-			params: 4
 		}),
 		new web3._extend.Method({
 			name: 'convertRequestTxHashToHandleTxHash',
@@ -1336,21 +1272,6 @@ web3._extend({
 			params: 1
 		}),
 		new web3._extend.Method({
-			name: 'setKLAYFee',
-			call: 'subbridge_setKLAYFee',
-			params: 2
-		}),
-		new web3._extend.Method({
-			name: 'setERC20Fee',
-			call: 'subbridge_setERC20Fee',
-			params: 3
-		}),
-		new web3._extend.Method({
-			name: 'setFeeReceiver',
-			call: 'subbridge_setFeeReceiver',
-			params: 2
-		}),
-		new web3._extend.Method({
 			name: 'getKLAYFee',
 			call: 'subbridge_getKLAYFee',
 			params: 1
@@ -1365,34 +1286,18 @@ web3._extend({
 			call: 'subbridge_getFeeReceiver',
 			params: 1
 		}),
-		new web3._extend.Method({
-			name: 'lockParentOperator',
-			call: 'subbridge_lockParentOperator'
-		}),
-		new web3._extend.Method({
-			name: 'lockChildOperator',
-			call: 'subbridge_lockChildOperator'
-		}),
-		new web3._extend.Method({
-			name: 'unlockParentOperator',
-			call: 'subbridge_unlockParentOperator',
-			params: 2
-		}),
-		new web3._extend.Method({
-			name: 'unlockChildOperator',
-			call: 'subbridge_unlockChildOperator',
-			params: 2
-		}),
-		new web3._extend.Method({
-			name: 'setParentOperatorFeePayer',
-			call: 'subbridge_setParentOperatorFeePayer',
+		/*
+		new web3._extend.Method({//ASD
+			name: 'getSessionKey',
+			call: 'subbridge_GetSessionKey',
 			params: 1
 		}),
-		new web3._extend.Method({
-			name: 'setChildOperatorFeePayer',
-			call: 'subbridge_setChildOperatorFeePayer',
-			params: 1
+		new web3._extend.Method({// ASD
+			name: 'revokeSessionKey',
+			call: 'subbridge_RevokeSessionKey',
+			params: 3
 		}),
+		*/
 	],
     properties: [
 		new web3._extend.Property({
@@ -1468,6 +1373,130 @@ web3._extend({
 	]
 });
 `
+
+const SubBridgeAdmin_JS = `
+web3._extend({
+	property: 'subbridgeAdmin',
+	methods: [
+		new web3._extend.Method({
+			name: 'testapi',
+			call: 'subbridgeAdmin_testAPI',
+			params: 1,
+		}),
+
+
+		new web3._extend.Method({ // ASD
+			name: 'addPeer',
+			call: 'subbridge_addPeer',
+			params: 1
+		}),
+		new web3._extend.Method({ // ASD
+			name: 'removePeer',
+			call: 'subbridge_removePeer',
+			params: 1
+		}),
+		new web3._extend.Method({// ASD
+			name: 'registerOperator',
+			call: 'subbridge_registerOperator',
+			params: 2
+		}),
+		new web3._extend.Method({// ASD
+			name: 'setValueTransferOperatorThreshold',
+			call: 'subbridge_setValueTransferOperatorThreshold',
+			params: 2
+		}),
+		new web3._extend.Method({// ASD
+			name: 'deployBridge',
+			call: 'subbridge_deployBridge',
+			params: 0
+		}),
+		new web3._extend.Method({// ASD
+			name: 'subscribeBridge',
+			call: 'subbridge_subscribeBridge',
+			params: 2
+		}),
+		new web3._extend.Method({// ASD
+			name: 'unsubscribeBridge',
+			call: 'subbridge_unsubscribeBridge',
+			params: 2
+		}),
+		new web3._extend.Method({// ASD
+			name: 'KASAnchor',
+			call: 'subbridge_kASAnchor',
+			params: 1
+		}),
+		new web3._extend.Method({// ASD
+			name: 'anchoring',
+			call: 'subbridge_anchoring',
+			params: 1
+		}),
+		new web3._extend.Method({// ASD
+			name: 'registerBridge',
+			call: 'subbridge_registerBridge',
+			params: 2
+		}),
+		new web3._extend.Method({// ASD
+			name: 'deregisterBridge',
+			call: 'subbridge_deregisterBridge',
+			params: 2
+		}),
+		new web3._extend.Method({// ASD
+			name: 'registerToken',
+			call: 'subbridge_registerToken',
+			params: 4
+		}),
+		new web3._extend.Method({// ASD
+			name: 'deregisterToken',
+			call: 'subbridge_deregisterToken',
+			params: 4
+		}),
+		new web3._extend.Method({// ASD
+			name: 'setKLAYFee',
+			call: 'subbridge_setKLAYFee',
+			params: 2
+		}),
+		new web3._extend.Method({// ASD
+			name: 'setERC20Fee',
+			call: 'subbridge_setERC20Fee',
+			params: 3
+		}),
+		new web3._extend.Method({// ASD
+			name: 'setFeeReceiver',
+			call: 'subbridge_setFeeReceiver',
+			params: 2
+		}),
+		new web3._extend.Method({// ASD
+			name: 'lockParentOperator',
+			call: 'subbridge_lockParentOperator'
+		}),
+		new web3._extend.Method({// ASD
+			name: 'lockChildOperator',
+			call: 'subbridge_lockChildOperator'
+		}),
+		new web3._extend.Method({// ASD
+			name: 'unlockParentOperator',
+			call: 'subbridge_unlockParentOperator',
+			params: 2
+		}),
+		new web3._extend.Method({// ASD
+			name: 'unlockChildOperator',
+			call: 'subbridge_unlockChildOperator',
+			params: 2
+		}),
+		new web3._extend.Method({// ASD
+			name: 'setParentOperatorFeePayer',
+			call: 'subbridge_setParentOperatorFeePayer',
+			params: 1
+		}),
+		new web3._extend.Method({// ASD
+			name: 'setChildOperatorFeePayer',
+			call: 'subbridge_setChildOperatorFeePayer',
+			params: 1
+		}),
+	],
+});
+`
+
 const CliqueJs = `
 web3._extend({
 	property: 'clique',
