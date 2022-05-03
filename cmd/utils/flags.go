@@ -59,6 +59,20 @@ import (
 	"gopkg.in/urfave/cli.v1"
 )
 
+type RPCScheme uint
+
+const (
+	HTTPScheme RPCScheme = iota
+	WSScheme
+)
+
+var (
+	NotAllowedAPIs = map[RPCScheme][]string{
+		HTTPScheme: []string{"subbridgeAdmin"},
+		WSScheme:   []string{"subbridgeAdmin"},
+	}
+)
+
 func InitHelper() {
 	cli.AppHelpTemplate = AppHelpTemplate
 	cli.CommandHelpTemplate = CommandHelpTemplate
@@ -1214,6 +1228,12 @@ func splitAndTrim(input string) []string {
 // setHTTP creates the HTTP RPC listener interface string from the set
 // command line flags, returning empty if the HTTP endpoint is disabled.
 func setHTTP(ctx *cli.Context, cfg *node.Config) {
+	httpModules := splitAndTrim(ctx.GlobalString(RPCApiFlag.Name))
+	notAllowedAPIs := isNotAllowedRPCAPI(HTTPScheme, httpModules)
+	if len(notAllowedAPIs) != 0 {
+		panic(fmt.Errorf("Found the not allowed apis: %v", notAllowedAPIs))
+	}
+
 	if ctx.GlobalBool(RPCEnabledFlag.Name) && cfg.HTTPHost == "" {
 		cfg.HTTPHost = "127.0.0.1"
 		if ctx.GlobalIsSet(RPCListenAddrFlag.Name) {
@@ -1228,7 +1248,7 @@ func setHTTP(ctx *cli.Context, cfg *node.Config) {
 		cfg.HTTPCors = splitAndTrim(ctx.GlobalString(RPCCORSDomainFlag.Name))
 	}
 	if ctx.GlobalIsSet(RPCApiFlag.Name) {
-		cfg.HTTPModules = splitAndTrim(ctx.GlobalString(RPCApiFlag.Name))
+		cfg.HTTPModules = httpModules
 	}
 	if ctx.GlobalIsSet(RPCVirtualHostsFlag.Name) {
 		cfg.HTTPVirtualHosts = splitAndTrim(ctx.GlobalString(RPCVirtualHostsFlag.Name))
@@ -1284,6 +1304,12 @@ func setTLS(ctx *cli.Context, cfg *node.Config) {
 // setWS creates the WebSocket RPC listener interface string from the set
 // command line flags, returning empty if the HTTP endpoint is disabled.
 func setWS(ctx *cli.Context, cfg *node.Config) {
+	wsModules := splitAndTrim(ctx.GlobalString(WSApiFlag.Name))
+	notAllowedAPIs := isNotAllowedRPCAPI(WSScheme, wsModules)
+	if len(notAllowedAPIs) != 0 {
+		panic(fmt.Errorf("Found the not allowed apis: %v", notAllowedAPIs))
+	}
+
 	if ctx.GlobalBool(WSEnabledFlag.Name) && cfg.WSHost == "" {
 		cfg.WSHost = "127.0.0.1"
 		if ctx.GlobalIsSet(WSListenAddrFlag.Name) {
@@ -1298,7 +1324,7 @@ func setWS(ctx *cli.Context, cfg *node.Config) {
 		cfg.WSOrigins = splitAndTrim(ctx.GlobalString(WSAllowedOriginsFlag.Name))
 	}
 	if ctx.GlobalIsSet(WSApiFlag.Name) {
-		cfg.WSModules = splitAndTrim(ctx.GlobalString(WSApiFlag.Name))
+		cfg.WSModules = wsModules
 	}
 	rpc.MaxSubscriptionPerWSConn = int32(ctx.GlobalInt(WSMaxSubscriptionPerConn.Name))
 	rpc.WebsocketReadDeadline = ctx.GlobalInt64(WSReadDeadLine.Name)
@@ -1931,4 +1957,14 @@ func getNetworkId(ctx *cli.Context) (uint64, bool) {
 		logger.Info("Cypress network ID is set", "networkid", params.CypressNetworkId)
 		return params.CypressNetworkId, false
 	}
+}
+
+func isNotAllowedRPCAPI(scheme RPCScheme, apis []string) []string {
+	var filtered []string
+	for _, notAllowedAPI := range NotAllowedAPIs[scheme] {
+		if Contains(apis, notAllowedAPI) {
+			filtered = append(filtered, notAllowedAPI)
+		}
+	}
+	return filtered
 }
