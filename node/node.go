@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -39,6 +40,11 @@ import (
 	"github.com/klaytn/klaytn/networks/rpc"
 	"github.com/klaytn/klaytn/storage/database"
 	"github.com/prometheus/prometheus/util/flock"
+)
+
+const (
+	DefaultRootCertPath = "session/rootcert.pem"
+	DefaultRootKeyPath  = "session/rootkey.pem"
 )
 
 var logger = log.NewModuleLogger(log.Node)
@@ -72,6 +78,8 @@ type Node struct {
 	httpWhitelist []string     // HTTP RPC modules to allow through this endpoint
 	httpListener  net.Listener // HTTP RPC listener socket to server API requests
 	httpHandler   *rpc.Server  // HTTP RPC request handler to process the API requests
+
+	tlsEndpoint string // TLS endpoint
 
 	wsEndpoint string       // Websocket endpoint (interface + port) to listen at (empty = websocket disabled)
 	wsListener net.Listener // Websocket RPC listener socket to server API requests
@@ -132,6 +140,7 @@ func New(conf *Config) (*Node, error) {
 		serviceFuncs:      []ServiceConstructor{},
 		ipcEndpoint:       conf.IPCEndpoint(),
 		httpEndpoint:      conf.HTTPEndpoint(),
+		tlsEndpoint:       conf.TLSEndpoint(),
 		wsEndpoint:        conf.WSEndpoint(),
 		grpcEndpoint:      conf.GRPCEndpoint(),
 		eventmux:          new(event.TypeMux),
@@ -350,6 +359,13 @@ func (n *Node) startRPC(services map[reflect.Type]Service) error {
 			return err
 		}
 	}
+	// start TLS RPC server
+	if err := n.startTLS(n.tlsEndpoint, apis, n.config.TLSModules, n.config.HTTPCors, n.config.HTTPVirtualHosts, n.config.HTTPTimeouts); err != nil {
+		n.stopIPC()
+		n.stopInProc()
+		return err
+	}
+
 	// start gRPC server
 	if err := n.startgRPC(apis); err != nil {
 		n.stopHTTP()
@@ -473,6 +489,25 @@ func (n *Node) startFastHTTP(endpoint string, apis []rpc.API, modules []string, 
 	// All listeners booted successfully
 	n.httpEndpoint = endpoint
 	n.httpListener = listener
+	n.httpHandler = handler
+
+	return nil
+}
+
+// startTLS initializes and starts the HTTP RPC endpoint.
+func (n *Node) startTLS(endpoint string, apis []rpc.API, modules []string, cors []string, vhosts []string, timeouts rpc.HTTPTimeouts) error {
+	// Short circuit if the HTTP endpoint isn't being exposed
+	if endpoint == "" {
+		return nil
+	}
+	tlsListener, handler, err := rpc.StartTLSEndpoint(endpoint, apis, modules, cors, vhosts, timeouts, path.Join(n.DataDir(), DefaultRootCertPath), path.Join(n.DataDir(), DefaultRootKeyPath))
+	if err != nil {
+		return err
+	}
+	n.logger.Info("TLS endpoint opened", "url", fmt.Sprintf("https://%s", endpoint), "cors", strings.Join(cors, ","), "vhosts", strings.Join(vhosts, ","))
+	// All listeners booted successfully
+	n.httpEndpoint = endpoint
+	n.httpListener = tlsListener
 	n.httpHandler = handler
 
 	return nil

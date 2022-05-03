@@ -21,6 +21,9 @@
 package rpc
 
 import (
+	"crypto/tls"
+	"crypto/x509"
+	"io/ioutil"
 	"net"
 )
 
@@ -80,6 +83,53 @@ func StartFastHTTPEndpoint(endpoint string, apis []API, modules []string, cors [
 	}
 	go NewFastHTTPServer(cors, vhosts, timeouts, handler).Serve(listener)
 	return listener, handler, err
+}
+
+// StartTLSEndpoint starts the TLS RPC endpoint, configured with cors/vhosts/modules
+func StartTLSEndpoint(endpoint string, apis []API, modules []string, cors []string, vhosts []string, timeouts HTTPTimeouts, rootCertPath, rootKeyPath string) (net.Listener, *Server, error) {
+	// Generate the whitelist based on the allowed modules
+	whitelist := make(map[string]bool)
+	for _, module := range modules {
+		whitelist[module] = true
+	}
+	// Register all the APIs exposed by the services
+	handler := NewServer()
+	for _, api := range apis {
+		if whitelist[api.Namespace] || (len(whitelist) == 0 && api.Public) {
+			if err := handler.RegisterName(api.Namespace, api.Service); err != nil {
+				return nil, nil, err
+			}
+			logger.Debug("FastHTTP(TLS) registered", "namespace", api.Namespace)
+		}
+	}
+	// All APIs registered, start the TLS listener
+	var (
+		listener    net.Listener
+		tlsListener net.Listener
+		err         error
+	)
+	if listener, err = net.Listen("tcp4", endpoint); err != nil {
+		return nil, nil, err
+	}
+	serverCert, err := tls.LoadX509KeyPair(rootCertPath, rootKeyPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	caCert, err := ioutil.ReadFile(rootCertPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+	tlsCfg := &tls.Config{
+		// Server's cert and rootCA's cert are the same.
+		Certificates: []tls.Certificate{serverCert},
+		ClientCAs:    caCertPool,
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+	}
+	tlsListener = tls.NewListener(listener, tlsCfg)
+	go NewHTTPServer(cors, vhosts, timeouts, handler).Serve(tlsListener)
+	return tlsListener, handler, err
 }
 
 // StartWSEndpoint starts a websocket endpoint
