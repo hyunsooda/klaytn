@@ -116,7 +116,8 @@ type SubBridge struct {
 	ctx          *node.ServiceContext
 	maxPeers     int
 
-	APIBackend *SubBridgeAPI
+	APIBackend      *SubBridgeAPI
+	adminAPIBackend *SubBridgeAdminAPI
 
 	// channels for fetcher, syncer, txsyncLoop
 	newPeerCh    chan BridgePeer
@@ -209,6 +210,7 @@ func NewSubBridge(ctx *node.ServiceContext, config *SCConfig) (*SubBridge, error
 
 	logger.Info("Initialising Klaytn-Bridge protocol", "network", config.NetworkId)
 	sb.APIBackend = &SubBridgeAPI{sb}
+	sb.adminAPIBackend = &SubBridgeAdminAPI{sb}
 
 	sb.bridgeTxPool = bridgepool.NewBridgeTxPool(bridgetxConfig)
 
@@ -304,6 +306,12 @@ func (sb *SubBridge) APIs() []rpc.API {
 			Namespace: "subbridge",
 			Version:   "1.0",
 			Service:   sb.netRPCService,
+			Public:    true,
+		},
+		{
+			Namespace: "subbridgeAdmin",
+			Version:   "1.0",
+			Service:   sb.adminAPIBackend,
 			Public:    true,
 		},
 	}
