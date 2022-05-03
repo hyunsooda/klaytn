@@ -96,6 +96,18 @@ type Config struct {
 	// relative), then that specific path is enforced. An empty path disables IPC.
 	IPCPath string `toml:",omitempty"`
 
+	TLSHost string `toml:",omitempty"`
+	// TLSHost is the host interface on which to start the TLS RPC server. If this
+	// field is empty, no TLS API endpoint will be started.
+
+	// TLSPort is the TCP port number on which to start the TLS RPC server.
+	TLSPort int `toml:",omitempty"`
+
+	// TLSModules is a list of API modules to expose via the TLS RPC interface.
+	// If the module list is empty, all RPC API endpoints designated public will be
+	// exposed.
+	TLSModules []string `toml:",omitempty"`
+
 	// HTTP module type is http server module type (fasthttp and http)
 	HTTPServerType string `toml:",omitempty"`
 
@@ -212,6 +224,13 @@ func DefaultIPCEndpoint(clientIdentifier string) string {
 	}
 	config := &Config{DataDir: DefaultDataDir(), IPCPath: clientIdentifier + ".ipc"}
 	return config.IPCEndpoint()
+}
+
+func (c *Config) TLSEndpoint() string {
+	if c.TLSHost == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s:%d", c.TLSHost, c.TLSPort)
 }
 
 // HTTPEndpoint resolves an HTTP endpoint based on the configured host interface

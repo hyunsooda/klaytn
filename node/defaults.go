@@ -39,6 +39,7 @@ import (
 const (
 	DefaultHTTPHost               = "localhost" // Default host interface for the HTTP RPC server
 	DefaultHTTPPort               = 8551        // Default TCP port for the HTTP RPC server
+	DefaultTLSPort                = 7551        // Default TCP port for the TLS RPC server
 	DefaultWSHost                 = "localhost" // Default host interface for the websocket RPC server
 	DefaultWSPort                 = 8552        // Default TCP port for the websocket RPC server
 	DefaultGRPCHost               = "localhost" // Default host interface for the gRPC server
@@ -53,6 +54,7 @@ var DefaultConfig = Config{
 	DBType:           DefaultDBType(),
 	DataDir:          DefaultDataDir(),
 	HTTPPort:         DefaultHTTPPort,
+	TLSPort:          DefaultTLSPort,
 	HTTPModules:      []string{"net", "web3"},
 	HTTPVirtualHosts: []string{"localhost"},
 	HTTPTimeouts:     rpc.DefaultHTTPTimeouts,
