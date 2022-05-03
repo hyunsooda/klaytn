@@ -122,6 +122,9 @@ var CommonNodeFlags = []cli.Flag{
 
 // Common RPC flags
 var CommonRPCFlags = []cli.Flag{
+	utils.TLSRPCEnabledFlag,
+	utils.TLSRPCPortFlag,
+	utils.TLSApiFlag,
 	utils.RPCEnabledFlag,
 	utils.RPCListenAddrFlag,
 	utils.RPCPortFlag,

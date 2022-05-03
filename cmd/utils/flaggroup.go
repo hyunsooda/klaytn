@@ -240,6 +240,9 @@ var FlagGroups = []FlagGroup{
 	{
 		Name: "API AND CONSOLE",
 		Flags: []cli.Flag{
+			TLSRPCEnabledFlag,
+			TLSRPCPortFlag,
+			TLSApiFlag,
 			RPCEnabledFlag,
 			RPCListenAddrFlag,
 			RPCPortFlag,

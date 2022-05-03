@@ -436,6 +436,21 @@ var (
 		Usage: "Prometheus exporter listening port",
 		Value: 61001,
 	}
+	// TLS RPC settings
+	TLSRPCEnabledFlag = cli.BoolFlag{
+		Name:  "tlsrpc",
+		Usage: "Enable the TLS-RPC server",
+	}
+	TLSRPCPortFlag = cli.IntFlag{
+		Name:  "tlsrpcport",
+		Usage: "TLS-RPC server listening port",
+		Value: node.DefaultTLSPort,
+	}
+	TLSApiFlag = cli.StringFlag{
+		Name:  "tlsrpcapi",
+		Usage: "API's offered over the TLS-RPC interface",
+		Value: "",
+	}
 	// RPC settings
 	RPCEnabledFlag = cli.BoolFlag{
 		Name:  "rpc",
@@ -1236,6 +1251,36 @@ func setHTTP(ctx *cli.Context, cfg *node.Config) {
 	}
 }
 
+// setTLS grabs TLS host and port number
+func setTLS(ctx *cli.Context, cfg *node.Config) {
+	tlsApis := splitAndTrim(ctx.GlobalString(TLSApiFlag.Name))
+	httpApis := splitAndTrim(ctx.GlobalString(RPCApiFlag.Name))
+	wsApis := splitAndTrim(ctx.GlobalString(WSApiFlag.Name))
+	var overappedAPIs []string
+	for _, tlsapi := range tlsApis {
+		if Contains(httpApis, tlsapi) {
+			overappedAPIs = append(overappedAPIs, tlsapi+"(HTTP RPC)")
+		}
+		if Contains(wsApis, tlsapi) {
+			overappedAPIs = append(overappedAPIs, tlsapi+"(WS RPC)")
+		}
+	}
+	if len(overappedAPIs) != 0 {
+		logger.Error("TLS RPC server is not launched because of overraped APIs", "APIs", overappedAPIs)
+		return
+	}
+
+	if ctx.GlobalBool(TLSRPCEnabledFlag.Name) {
+		cfg.TLSHost = "0.0.0.0"
+	}
+	if ctx.GlobalIsSet(TLSRPCPortFlag.Name) {
+		cfg.TLSPort = ctx.GlobalInt(TLSRPCPortFlag.Name)
+	}
+	if ctx.GlobalIsSet(RPCApiFlag.Name) {
+		cfg.TLSModules = tlsApis
+	}
+}
+
 // setWS creates the WebSocket RPC listener interface string from the set
 // command line flags, returning empty if the HTTP endpoint is disabled.
 func setWS(ctx *cli.Context, cfg *node.Config) {
@@ -1430,6 +1475,7 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	}
 
 	setHTTP(ctx, cfg)
+	setTLS(ctx, cfg)
 	setWS(ctx, cfg)
 	setgRPC(ctx, cfg)
 	setAPIConfig(ctx)
