@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/klaytn/klaytn/cmd/homi/cert"
 	"github.com/klaytn/klaytn/cmd/homi/extra"
 	"github.com/klaytn/klaytn/cmd/homi/setup"
 	"github.com/klaytn/klaytn/cmd/utils/nodecmd"
@@ -40,6 +41,7 @@ func main() {
 	app.Commands = []cli.Command{
 		setup.SetupCommand,
 		extra.ExtraCommand,
+		cert.CertCommand,
 	}
 
 	app.CommandNotFound = nodecmd.CommandNotExist
