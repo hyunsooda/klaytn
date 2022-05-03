@@ -1379,118 +1379,111 @@ web3._extend({
 	property: 'subbridgeAdmin',
 	methods: [
 		new web3._extend.Method({
-			name: 'testapi',
-			call: 'subbridgeAdmin_testAPI',
-			params: 1,
-		}),
-
-
-		new web3._extend.Method({ // ASD
 			name: 'addPeer',
-			call: 'subbridge_addPeer',
+			call: 'subbridgeAdmin_addPeer',
 			params: 1
 		}),
-		new web3._extend.Method({ // ASD
+		new web3._extend.Method({
 			name: 'removePeer',
-			call: 'subbridge_removePeer',
+			call: 'subbridgeAdmin_removePeer',
 			params: 1
 		}),
-		new web3._extend.Method({// ASD
+		new web3._extend.Method({
 			name: 'registerOperator',
-			call: 'subbridge_registerOperator',
+			call: 'subbridgeAdmin_registerOperator',
 			params: 2
 		}),
-		new web3._extend.Method({// ASD
+		new web3._extend.Method({
 			name: 'setValueTransferOperatorThreshold',
-			call: 'subbridge_setValueTransferOperatorThreshold',
+			call: 'subbridgeAdmin_setValueTransferOperatorThreshold',
 			params: 2
 		}),
-		new web3._extend.Method({// ASD
+		new web3._extend.Method({
 			name: 'deployBridge',
-			call: 'subbridge_deployBridge',
+			call: 'subbridgeAdmin_deployBridge',
 			params: 0
 		}),
-		new web3._extend.Method({// ASD
+		new web3._extend.Method({
 			name: 'subscribeBridge',
-			call: 'subbridge_subscribeBridge',
+			call: 'subbridgeAdmin_subscribeBridge',
 			params: 2
 		}),
-		new web3._extend.Method({// ASD
+		new web3._extend.Method({
 			name: 'unsubscribeBridge',
-			call: 'subbridge_unsubscribeBridge',
+			call: 'subbridgeAdmin_unsubscribeBridge',
 			params: 2
 		}),
-		new web3._extend.Method({// ASD
+		new web3._extend.Method({
 			name: 'KASAnchor',
-			call: 'subbridge_kASAnchor',
+			call: 'subbridgeAdmin_kASAnchor',
 			params: 1
 		}),
-		new web3._extend.Method({// ASD
+		new web3._extend.Method({
 			name: 'anchoring',
-			call: 'subbridge_anchoring',
+			call: 'subbridgeAdmin_anchoring',
 			params: 1
 		}),
-		new web3._extend.Method({// ASD
+		new web3._extend.Method({
 			name: 'registerBridge',
-			call: 'subbridge_registerBridge',
+			call: 'subbridgeAdmin_registerBridge',
 			params: 2
 		}),
-		new web3._extend.Method({// ASD
+		new web3._extend.Method({
 			name: 'deregisterBridge',
-			call: 'subbridge_deregisterBridge',
+			call: 'subbridgeAdmin_deregisterBridge',
 			params: 2
 		}),
-		new web3._extend.Method({// ASD
+		new web3._extend.Method({
 			name: 'registerToken',
-			call: 'subbridge_registerToken',
+			call: 'subbridgeAdmin_registerToken',
 			params: 4
 		}),
-		new web3._extend.Method({// ASD
+		new web3._extend.Method({
 			name: 'deregisterToken',
-			call: 'subbridge_deregisterToken',
+			call: 'subbridgeAdmin_deregisterToken',
 			params: 4
 		}),
-		new web3._extend.Method({// ASD
+		new web3._extend.Method({
 			name: 'setKLAYFee',
-			call: 'subbridge_setKLAYFee',
+			call: 'subbridgeAdmin_setKLAYFee',
 			params: 2
 		}),
-		new web3._extend.Method({// ASD
+		new web3._extend.Method({
 			name: 'setERC20Fee',
-			call: 'subbridge_setERC20Fee',
+			call: 'subbridgeAdmin_setERC20Fee',
 			params: 3
 		}),
-		new web3._extend.Method({// ASD
+		new web3._extend.Method({
 			name: 'setFeeReceiver',
-			call: 'subbridge_setFeeReceiver',
+			call: 'subbridgeAdmin_setFeeReceiver',
 			params: 2
 		}),
-		new web3._extend.Method({// ASD
+		new web3._extend.Method({
 			name: 'lockParentOperator',
-			call: 'subbridge_lockParentOperator'
+			call: 'subbridgeAdmin_lockParentOperator'
 		}),
-		new web3._extend.Method({// ASD
+		new web3._extend.Method({
 			name: 'lockChildOperator',
-			call: 'subbridge_lockChildOperator'
+			call: 'subbridgeAdmin_lockChildOperator'
 		}),
-		new web3._extend.Method({// ASD
+		new web3._extend.Method({
 			name: 'unlockParentOperator',
-			call: 'subbridge_unlockParentOperator',
+			call: 'subbridgeAdmin_unlockParentOperator',
 			params: 2
 		}),
-		new web3._extend.Method({// ASD
+		new web3._extend.Method({
 			name: 'unlockChildOperator',
-			call: 'subbridge_unlockChildOperator',
+			call: 'subbridgeAdmin_unlockChildOperator',
 			params: 2
 		}),
-		new web3._extend.Method({// ASD
+		new web3._extend.Method({
 			name: 'setParentOperatorFeePayer',
-			call: 'subbridge_setParentOperatorFeePayer',
+			call: 'subbridgeAdmin_setParentOperatorFeePayer',
 			params: 1
 		}),
-		new web3._extend.Method({// ASD
+		new web3._extend.Method({
 			name: 'setChildOperatorFeePayer',
-			call: 'subbridge_setChildOperatorFeePayer',
+			call: 'subbridgeAdmin_setChildOperatorFeePayer',
 			params: 1
 		}),
 	],
