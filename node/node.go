@@ -80,6 +80,8 @@ type Node struct {
 	httpHandler   *rpc.Server  // HTTP RPC request handler to process the API requests
 
 	tlsEndpoint string // TLS endpoint
+	tlsListener net.Listener
+	tlsHandler  *rpc.Server
 
 	wsEndpoint string       // Websocket endpoint (interface + port) to listen at (empty = websocket disabled)
 	wsListener net.Listener // Websocket RPC listener socket to server API requests
@@ -361,6 +363,8 @@ func (n *Node) startRPC(services map[reflect.Type]Service) error {
 	}
 	// start TLS RPC server
 	if err := n.startTLS(n.tlsEndpoint, apis, n.config.TLSModules, n.config.HTTPCors, n.config.HTTPVirtualHosts, n.config.HTTPTimeouts); err != nil {
+		n.stopWS()
+		n.stopHTTP()
 		n.stopIPC()
 		n.stopInProc()
 		return err
@@ -506,9 +510,9 @@ func (n *Node) startTLS(endpoint string, apis []rpc.API, modules []string, cors 
 	}
 	n.logger.Info("TLS endpoint opened", "url", fmt.Sprintf("https://%s", endpoint), "cors", strings.Join(cors, ","), "vhosts", strings.Join(vhosts, ","))
 	// All listeners booted successfully
-	n.httpEndpoint = endpoint
-	n.httpListener = tlsListener
-	n.httpHandler = handler
+	n.tlsEndpoint = endpoint
+	n.tlsListener = tlsListener
+	n.tlsHandler = handler
 
 	return nil
 }
@@ -593,6 +597,20 @@ func (n *Node) stopgRPC() {
 	}
 }
 
+func (n *Node) stopTLS() {
+	if n.tlsListener != nil {
+		n.tlsListener.Close()
+		n.tlsListener = nil
+
+		n.logger.Info("TLS endpoint closed", "url", fmt.Sprintf("https://%s", n.tlsEndpoint))
+	}
+
+	if n.tlsHandler != nil {
+		n.tlsHandler.Stop()
+		n.tlsHandler = nil
+	}
+}
+
 // Stop terminates a running node along with all it's services. In the node was
 // not started, an error is returned.
 func (n *Node) Stop() error {
@@ -605,6 +623,7 @@ func (n *Node) Stop() error {
 	}
 
 	// Terminate the API, services and the p2p server.
+	n.stopTLS()
 	n.stopWS()
 	n.stopHTTP()
 	n.stopIPC()
