@@ -37,7 +37,9 @@ import (
 )
 
 var (
-	logger = log.NewModuleLogger(log.StorageStateDB)
+	f      int64 = 0
+	m      int64 = 0
+	logger       = log.NewModuleLogger(log.StorageStateDB)
 
 	// metrics for Cap state
 	memcacheFlushTimeGauge  = metrics.NewRegisteredGauge("trie/memcache/flush/time", nil)
@@ -56,8 +58,11 @@ var (
 	memcacheUncacheTimeGauge = metrics.NewRegisteredGauge("trie/memcache/uncache/time", nil)
 
 	// metrics for state trie cache db
-	memcacheCleanHitMeter          = metrics.NewRegisteredMeter("trie/memcache/clean/hit", nil)
-	memcacheCleanMissMeter         = metrics.NewRegisteredMeter("trie/memcache/clean/miss", nil)
+	memcacheCleanHitMeter = metrics.NewRegisteredMeter("trie/memcache/clean/hit", nil)
+
+	fastcacheMiss = metrics.NewRegisteredGauge("test/fastcache/miss", nil)
+	memMiss       = metrics.NewRegisteredGauge("test/mem/miss", nil)
+
 	memcacheCleanPrefetchMissMeter = metrics.NewRegisteredMeter("trie/memcache/clean/prefetch/miss", nil)
 	memcacheCleanReadMeter         = metrics.NewRegisteredMeter("trie/memcache/clean/read", nil)
 	memcacheCleanWriteMeter        = metrics.NewRegisteredMeter("trie/memcache/clean/write", nil)
@@ -334,19 +339,23 @@ func NewDatabaseWithExistingCache(diskDB database.DBManager, cache TrieNodeCache
 }
 
 func getTrieNodeCacheSizeMiB() int {
+	// totalPhysicalMemMiB := float64(memory.TotalMemory() / 1024 / 1024)
+
+	// if totalPhysicalMemMiB < 10*1024 {
+	// 	return 0
+	// } else if totalPhysicalMemMiB < 20*1024 {
+	// 	return 1 * 1024 // allocate 1G for small memory
+	// }
+
+	// memoryScalePercent := 0.3 // allocate 30% for 20 < mem < 100
+	// if totalPhysicalMemMiB > 100*1024 {
+	// 	memoryScalePercent = 0.35 // allocate 35% for 100 < mem
+	// }
+
+	// return int(totalPhysicalMemMiB * memoryScalePercent)
+
 	totalPhysicalMemMiB := float64(memory.TotalMemory() / 1024 / 1024)
-
-	if totalPhysicalMemMiB < 10*1024 {
-		return 0
-	} else if totalPhysicalMemMiB < 20*1024 {
-		return 1 * 1024 // allocate 1G for small memory
-	}
-
 	memoryScalePercent := 0.3 // allocate 30% for 20 < mem < 100
-	if totalPhysicalMemMiB > 100*1024 {
-		memoryScalePercent = 0.35 // allocate 35% for 100 < mem
-	}
-
 	return int(totalPhysicalMemMiB * memoryScalePercent)
 }
 
@@ -495,8 +504,14 @@ func (db *Database) setCachedNode(hash common.ExtHash, enc []byte) {
 	}
 }
 
-func recordTrieCacheMiss() {
-	memcacheCleanMissMeter.Mark(1)
+func fastCacheMiss() {
+	f += 1
+	fastcacheMiss.Update(f)
+}
+
+func memCacheMiss() {
+	m += 1
+	memMiss.Update(m)
 }
 
 // node retrieves a cached trie node from memory, or returns nil if node can be
@@ -510,6 +525,7 @@ func (db *Database) node(hash common.ExtHash) (n node, fromDB bool) {
 			logger.Error("node from cached trie node fails to be decoded!", "err", err)
 		}
 	}
+	fastCacheMiss()
 
 	// Retrieve the node from the state cache if available
 	db.lock.RLock()
@@ -518,6 +534,7 @@ func (db *Database) node(hash common.ExtHash) (n node, fromDB bool) {
 	if node != nil {
 		return node.obj(hash), false
 	}
+	memCacheMiss()
 
 	// Content unavailable in memory, attempt to retrieve from disk
 	enc, err := db.diskDB.ReadTrieNode(hash)
@@ -525,7 +542,6 @@ func (db *Database) node(hash common.ExtHash) (n node, fromDB bool) {
 		return nil, true
 	}
 	db.setCachedNode(hash, enc)
-	recordTrieCacheMiss()
 	return mustDecodeNode(hash[:], enc), true
 }
 
@@ -539,6 +555,7 @@ func (db *Database) Node(hash common.ExtHash) ([]byte, error) {
 	if enc := db.getCachedNode(hash); enc != nil {
 		return enc, nil
 	}
+	fastCacheMiss()
 
 	// Retrieve the node from cache if available
 	db.lock.RLock()
@@ -548,11 +565,11 @@ func (db *Database) Node(hash common.ExtHash) ([]byte, error) {
 	if node != nil {
 		return node.rlp(), nil
 	}
+	memCacheMiss()
 	// Content unavailable in memory, attempt to retrieve from disk
 	enc, err := db.diskDB.ReadTrieNode(hash)
 	if err == nil && enc != nil {
 		db.setCachedNode(hash, enc)
-		recordTrieCacheMiss()
 	}
 	return enc, err
 }
@@ -567,6 +584,7 @@ func (db *Database) NodeFromOld(hash common.ExtHash) ([]byte, error) {
 	if enc := db.getCachedNode(hash); enc != nil {
 		return enc, nil
 	}
+	fastCacheMiss()
 
 	// Retrieve the node from cache if available
 	db.lock.RLock()
@@ -576,11 +594,11 @@ func (db *Database) NodeFromOld(hash common.ExtHash) ([]byte, error) {
 	if node != nil {
 		return node.rlp(), nil
 	}
+	memCacheMiss()
 	// Content unavailable in memory, attempt to retrieve from disk
 	enc, err := db.diskDB.ReadTrieNodeFromOld(hash)
 	if err == nil && enc != nil {
 		db.setCachedNode(hash, enc)
-		recordTrieCacheMiss()
 	}
 	return enc, err
 }
