@@ -34,6 +34,8 @@ import (
 	"github.com/klaytn/klaytn/storage/database"
 	"github.com/pbnjay/memory"
 	"github.com/rcrowley/go-metrics"
+
+	klaytnmetrics "github.com/klaytn/klaytn/metrics"
 )
 
 var (
@@ -60,8 +62,9 @@ var (
 	// metrics for state trie cache db
 	memcacheCleanHitMeter = metrics.NewRegisteredMeter("trie/memcache/clean/hit", nil)
 
-	fastcacheMiss = metrics.NewRegisteredGauge("test/fastcache/miss", nil)
-	memMiss       = metrics.NewRegisteredGauge("test/mem/miss", nil)
+	fastcacheMiss     = metrics.NewRegisteredGauge("test/fastcache/miss", nil)
+	memMiss           = metrics.NewRegisteredGauge("test/mem/miss", nil)
+	nodeDiskReadTimer = klaytnmetrics.NewRegisteredHybridTimer("test/mem/diskread", nil)
 
 	memcacheCleanPrefetchMissMeter = metrics.NewRegisteredMeter("trie/memcache/clean/prefetch/miss", nil)
 	memcacheCleanReadMeter         = metrics.NewRegisteredMeter("trie/memcache/clean/read", nil)
@@ -537,7 +540,10 @@ func (db *Database) node(hash common.ExtHash) (n node, fromDB bool) {
 	memCacheMiss()
 
 	// Content unavailable in memory, attempt to retrieve from disk
+	start := time.Now()
 	enc, err := db.diskDB.ReadTrieNode(hash)
+	elapsed := time.Since(start)
+	nodeDiskReadTimer.Update(elapsed)
 	if err != nil || enc == nil {
 		return nil, true
 	}
@@ -566,8 +572,11 @@ func (db *Database) Node(hash common.ExtHash) ([]byte, error) {
 		return node.rlp(), nil
 	}
 	memCacheMiss()
+	start := time.Now()
 	// Content unavailable in memory, attempt to retrieve from disk
 	enc, err := db.diskDB.ReadTrieNode(hash)
+	elapsed := time.Since(start)
+	nodeDiskReadTimer.Update(elapsed)
 	if err == nil && enc != nil {
 		db.setCachedNode(hash, enc)
 	}
@@ -595,8 +604,12 @@ func (db *Database) NodeFromOld(hash common.ExtHash) ([]byte, error) {
 		return node.rlp(), nil
 	}
 	memCacheMiss()
+
+	start := time.Now()
 	// Content unavailable in memory, attempt to retrieve from disk
 	enc, err := db.diskDB.ReadTrieNodeFromOld(hash)
+	elapsed := time.Since(start)
+	nodeDiskReadTimer.Update(elapsed)
 	if err == nil && enc != nil {
 		db.setCachedNode(hash, enc)
 	}
