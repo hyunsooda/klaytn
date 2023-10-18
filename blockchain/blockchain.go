@@ -2125,6 +2125,11 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 				return i, events, coalescedLogs, err
 			}
 		}
+
+		// if block.NumberU64() == 1000000 {
+		// 	fmt.Println("current block number is 1,000,000. Exit")
+		// 	os.Exit(1)
+		// }
 	}
 	// Append a single chain head event if we've progressed the chain
 	if lastCanon != nil && bc.CurrentBlock().Hash() == lastCanon.Hash() {

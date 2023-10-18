@@ -324,8 +324,10 @@ func (t *Trie) TryUpdateWithHexKey(hexKey, value []byte) error {
 func (t *Trie) insert(n node, prefix, key []byte, value node) (bool, node, error) {
 	if len(key) == 0 {
 		if v, ok := n.(valueNode); ok {
-			return !bytes.Equal(v, value.(valueNode)), value, nil
+			dirty := !bytes.Equal(v, value.(valueNode))
+			return dirty, value, nil
 		}
+		t.markPrunableNode(n) // this node has changed
 		return true, value, nil
 	}
 	switch n := n.(type) {
@@ -372,6 +374,7 @@ func (t *Trie) insert(n node, prefix, key []byte, value node) (bool, node, error
 		return true, n, nil
 
 	case nil:
+		t.markPrunableNode(n) // this node has changed
 		return true, &shortNode{key, value, t.newFlag()}, nil
 
 	case hashNode:
@@ -386,6 +389,7 @@ func (t *Trie) insert(n node, prefix, key []byte, value node) (bool, node, error
 		if !dirty || err != nil {
 			return false, rn, err
 		}
+		t.markPrunableNode(n) // this node has changed
 		return true, nn, nil
 
 	default:
@@ -503,6 +507,7 @@ func (t *Trie) delete(n node, prefix, key []byte) (bool, node, error) {
 		return true, n, nil
 
 	case valueNode:
+		t.markPrunableNode(n) // this node has changed
 		return true, nil, nil
 
 	case nil:
@@ -520,6 +525,7 @@ func (t *Trie) delete(n node, prefix, key []byte) (bool, node, error) {
 		if !dirty || err != nil {
 			return false, rn, err
 		}
+		t.markPrunableNode(n) // this node has changed
 		return true, nn, nil
 
 	default:
@@ -610,11 +616,20 @@ func (t *Trie) markPrunableNode(n node) {
 		return
 	}
 
+	if n == nil {
+		return
+	}
+
 	if hn, ok := n.(hashNode); ok {
+		fmt.Println("HHH-1")
+		// panic("EE")
 		// If a node exists as a hashNode, it means the node is either:
 		// (1) lives in database but yet to be resolved - subject to pruning,
 		// (2) collapsed by Hash or Commit - may or may not be in database, add the mark anyway.
 		t.pruningMarksCache[common.BytesToExtHash(hn)] = t.PruningBlockNumber
+	} else if vn, ok := n.(valueNode); ok {
+		fmt.Println("HHH-2")
+		t.pruningMarksCache[common.BytesToExtHash(vn)] = t.PruningBlockNumber
 	} else if hn, _ := n.cache(); hn != nil {
 		// If node.flags.hash is nonempty, it means the node is either:
 		// (1) loaded from databas - subject to pruning,
