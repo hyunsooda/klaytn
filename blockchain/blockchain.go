@@ -2135,6 +2135,9 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 				return i, events, coalescedLogs, err
 			}
 		}
+
+		// reset cache trie if needed
+		bc.stateCache.TrieDB().ResetCacheTrie()
 	}
 	// Append a single chain head event if we've progressed the chain
 	if lastCanon != nil && bc.CurrentBlock().Hash() == lastCanon.Hash() {

@@ -28,6 +28,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/VictoriaMetrics/fastcache"
 	"github.com/klaytn/klaytn/common"
 	"github.com/klaytn/klaytn/log"
 	"github.com/klaytn/klaytn/rlp"
@@ -61,6 +62,8 @@ var (
 	memcacheCleanPrefetchMissMeter = metrics.NewRegisteredMeter("trie/memcache/clean/prefetch/miss", nil)
 	memcacheCleanReadMeter         = metrics.NewRegisteredMeter("trie/memcache/clean/read", nil)
 	memcacheCleanWriteMeter        = metrics.NewRegisteredMeter("trie/memcache/clean/write", nil)
+	// Record for only `fastcache` type cache
+	memcacheResizeMeter = metrics.NewRegisteredGauge("trie/memcache/cache/resized", nil)
 
 	// metric of total node number
 	memcacheNodesGauge = metrics.NewRegisteredGauge("trie/memcache/nodes", nil)
@@ -330,20 +333,26 @@ func NewDatabaseWithExistingCache(diskDB database.DBManager, cache TrieNodeCache
 }
 
 func getTrieNodeCacheSizeMiB() int {
-	totalPhysicalMemMiB := float64(memory.TotalMemory() / 1024 / 1024)
-
-	if totalPhysicalMemMiB < 10*1024 {
+	var (
+		totalRam = float64(memory.TotalMemory() / 1024 / 1024) // MB unit
+		freeRam  = float64(memory.FreeMemory() / 1024 / 1024)  // MB unit
+	)
+	// Use the value of `totalRam` for resized factor as it is immutable value
+	// While the `freeRam` is excessively increased and decreased at runtime
+	switch {
+	case freeRam > totalRam*0.9: // allocate 30% of cache for >90% of available system memory
+		return int(totalRam * 0.3)
+	case freeRam > totalRam*0.75: // allocate 25% of cache for >75% of available system memory
+		return int(totalRam * 0.25)
+	case freeRam > totalRam*0.5: // allocate 17% of cache for >50% of available system memory
+		return int(totalRam * 0.17)
+	case freeRam > totalRam*0.3: // allocate 10% of cache for >30% of available system memory
+		return int(totalRam * 0.1)
+	case freeRam > totalRam*0.1: // allocate 1% of cache for >10% of available system memory
+		return int(totalRam * 0.01)
+	default: // do not use cache for available system memory under 10%
 		return 0
-	} else if totalPhysicalMemMiB < 20*1024 {
-		return 1 * 1024 // allocate 1G for small memory
 	}
-
-	memoryScalePercent := 0.3 // allocate 30% for 20 < mem < 100
-	if totalPhysicalMemMiB > 100*1024 {
-		memoryScalePercent = 0.35 // allocate 35% for 100 < mem
-	}
-
-	return int(totalPhysicalMemMiB * memoryScalePercent)
 }
 
 // DiskDB retrieves the persistent database backing the trie database.
@@ -469,6 +478,37 @@ func (db *Database) insertPruningMark(hash common.ExtHash, blockNum uint64) {
 		Number: blockNum,
 		Hash:   hash,
 	})
+}
+
+func (db *Database) ResetCacheTrie() {
+	if db.trieNodeCacheConfig.CacheType != CacheTypeLocal {
+		// cache size scheduling perfomrs for only `fastcache` type
+		return
+	}
+
+	curCacheSize := db.trieNodeCacheConfig.LocalCacheSizeMiB
+	newCacheSize := getTrieNodeCacheSizeMiB()
+
+	if newCacheSize != curCacheSize {
+		if newCacheSize == 0 {
+			logger.Info("[TrieCache] Trie cache temporarily removed due to critically low available memory.",
+				"freeMemory(GB)", float64(memory.FreeMemory())/1024/1024/1024)
+		} else {
+			prevInUse := float64(0)
+			if db.trieNodeCache != nil {
+				prevInUse = float64(db.trieNodeCache.UpdateStats().(fastcache.Stats).BytesSize) / 1024 / 1024 / 1024
+			}
+			logger.Info("[TrieCache] Resized trie cache",
+				"prevSize(GB)", float64(curCacheSize)/1024,
+				"prevUseIn(GB)", prevInUse,
+				"newSize(GB)", float64(newCacheSize)/1024,
+				"type", db.trieNodeCacheConfig.CacheType)
+		}
+		db.trieNodeCacheConfig.LocalCacheSizeMiB = newCacheSize
+		// previous fastcache memory is not danlging pointer, which would be dellocated by GC
+		db.trieNodeCache = newFastCache(db.trieNodeCacheConfig)
+		memcacheResizeMeter.Update(int64(newCacheSize))
+	}
 }
 
 // getCachedNode finds an encoded node in the trie node cache if enabled.

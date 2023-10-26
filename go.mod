@@ -38,7 +38,7 @@ require (
 	github.com/naoina/toml v0.1.2-0.20170918210437-9fafd6967416
 	github.com/newrelic/go-agent/v3 v3.11.0
 	github.com/otiai10/copy v1.0.1
-	github.com/pbnjay/memory v0.0.0-20190104145345-974d429e7ae4
+	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pborman/uuid v0.0.0-20170612153648-e790cca94e6c
 	github.com/peterh/liner v1.1.1-0.20190123174540-a2c9a5303de7
 	github.com/pkg/errors v0.9.1
