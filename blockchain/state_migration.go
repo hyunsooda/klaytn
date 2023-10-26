@@ -474,7 +474,6 @@ func (bc *BlockChain) wramUpTrieCache(mainTrieDB *statedb.Database, minLoad uint
 			}
 			logged = time.Now()
 			updateContext()
-			logger.Info("Warm up progess", context...)
 			if progress > uint64(minLoad) { // more than 90%
 				close(bc.quitWarmUp)
 				logger.Info("Warm up is completed", context...)
