@@ -62,8 +62,8 @@ var (
 	// metrics for state trie cache db
 	memcacheCleanHitMeter = metrics.NewRegisteredMeter("trie/memcache/clean/hit", nil)
 
-	fastcacheMiss     = metrics.NewRegisteredGauge("test/fastcache/miss", nil)
-	memMiss           = metrics.NewRegisteredGauge("test/mem/miss", nil)
+	fastcacheMiss     = metrics.NewRegisteredMeter("test/fastcache/miss", nil)
+	memMiss           = metrics.NewRegisteredMeter("test/mem/miss", nil)
 	nodeDiskReadTimer = klaytnmetrics.NewRegisteredHybridTimer("test/mem/diskread", nil)
 
 	memcacheCleanPrefetchMissMeter = metrics.NewRegisteredMeter("trie/memcache/clean/prefetch/miss", nil)
@@ -509,12 +509,12 @@ func (db *Database) setCachedNode(hash common.ExtHash, enc []byte) {
 
 func fastCacheMiss() {
 	f += 1
-	fastcacheMiss.Update(f)
+	fastcacheMiss.Mark(1)
 }
 
 func memCacheMiss() {
 	m += 1
-	memMiss.Update(m)
+	memMiss.Mark(1)
 }
 
 // node retrieves a cached trie node from memory, or returns nil if node can be
