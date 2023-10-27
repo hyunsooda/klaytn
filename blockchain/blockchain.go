@@ -77,8 +77,8 @@ var (
 	snapshotCommitTimer      = metrics.NewRegisteredTimer("state/snapshot/commits", nil)
 
 	blockBaseFee        = metrics.NewRegisteredGauge("chain/basefee", nil)
-	blockInsertTimer    = klaytnmetrics.NewRegisteredHybridTimer("chain/inserts", nil)
-	blockProcessTimer   = klaytnmetrics.NewRegisteredHybridTimer("chain/process", nil)
+	blockInsertTimer    = metrics.NewRegisteredTimer("chain/inserts", nil)
+	blockProcessTimer   = metrics.NewRegisteredTimer("chain/process", nil)
 	blockExecutionTimer = klaytnmetrics.NewRegisteredHybridTimer("chain/execution", nil)
 	blockFinalizeTimer  = klaytnmetrics.NewRegisteredHybridTimer("chain/finalize", nil)
 	blockValidateTimer  = klaytnmetrics.NewRegisteredHybridTimer("chain/validate", nil)

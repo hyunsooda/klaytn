@@ -34,8 +34,6 @@ import (
 	"github.com/klaytn/klaytn/storage/database"
 	"github.com/pbnjay/memory"
 	"github.com/rcrowley/go-metrics"
-
-	klaytnmetrics "github.com/klaytn/klaytn/metrics"
 )
 
 var (
@@ -64,7 +62,8 @@ var (
 
 	fastcacheMiss     = metrics.NewRegisteredMeter("test/fastcache/miss", nil)
 	memMiss           = metrics.NewRegisteredMeter("test/mem/miss", nil)
-	nodeDiskReadTimer = klaytnmetrics.NewRegisteredHybridTimer("test/mem/diskread", nil)
+	nodeDiskReadTimer = metrics.NewRegisteredTimer("test/mem/diskreadtime", nil)
+	diskAccess        = metrics.NewRegisteredMeter("test/mem/diskreadnum", nil)
 
 	memcacheCleanPrefetchMissMeter = metrics.NewRegisteredMeter("trie/memcache/clean/prefetch/miss", nil)
 	memcacheCleanReadMeter         = metrics.NewRegisteredMeter("trie/memcache/clean/read", nil)
@@ -543,7 +542,8 @@ func (db *Database) node(hash common.ExtHash) (n node, fromDB bool) {
 	start := time.Now()
 	enc, err := db.diskDB.ReadTrieNode(hash)
 	elapsed := time.Since(start)
-	nodeDiskReadTimer.Update(elapsed)
+	nodeDiskReadTimer.Update(time.Duration(common.PrettyDuration((elapsed))))
+	diskAccess.Mark(1)
 	if err != nil || enc == nil {
 		return nil, true
 	}
@@ -576,7 +576,8 @@ func (db *Database) Node(hash common.ExtHash) ([]byte, error) {
 	// Content unavailable in memory, attempt to retrieve from disk
 	enc, err := db.diskDB.ReadTrieNode(hash)
 	elapsed := time.Since(start)
-	nodeDiskReadTimer.Update(elapsed)
+	nodeDiskReadTimer.Update(time.Duration(common.PrettyDuration((elapsed))))
+	diskAccess.Mark(1)
 	if err == nil && enc != nil {
 		db.setCachedNode(hash, enc)
 	}
@@ -609,7 +610,8 @@ func (db *Database) NodeFromOld(hash common.ExtHash) ([]byte, error) {
 	// Content unavailable in memory, attempt to retrieve from disk
 	enc, err := db.diskDB.ReadTrieNodeFromOld(hash)
 	elapsed := time.Since(start)
-	nodeDiskReadTimer.Update(elapsed)
+	nodeDiskReadTimer.Update(time.Duration(common.PrettyDuration((elapsed))))
+	diskAccess.Mark(1)
 	if err == nil && enc != nil {
 		db.setCachedNode(hash, enc)
 	}
