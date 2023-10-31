@@ -282,6 +282,10 @@ type PruningMark struct {
 	Hash   common.ExtHash
 }
 
+func (pm PruningMark) Copy() PruningMark {
+	return pm
+}
+
 // TriePruningMarkKey = prefix + number + hash
 // Block number comes first to sort the entries by block numbers.
 // Later we can iterate through the marks and extract any given block number range.
