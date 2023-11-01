@@ -22,6 +22,7 @@ package statedb
 
 import (
 	"github.com/klaytn/klaytn/common"
+	"github.com/klaytn/klaytn/storage/database"
 )
 
 // SecureTrie wraps a trie with key hashing. In a secure trie, all
@@ -232,4 +233,8 @@ func (t *SecureTrie) getSecKeyCache() map[string][]byte {
 		t.secKeyCache = make(map[string][]byte)
 	}
 	return t.secKeyCache
+}
+
+func (t *SecureTrie) GetPruningMarks() []database.PruningMark {
+	return nil
 }

@@ -27,6 +27,7 @@ import (
 
 	"github.com/klaytn/klaytn/common"
 	"github.com/klaytn/klaytn/crypto"
+	"github.com/klaytn/klaytn/storage/database"
 )
 
 var (
@@ -580,7 +581,7 @@ func (t *Trie) CommitExt(onleaf LeafCallback) (root common.ExtHash, err error) {
 	if t.db == nil {
 		panic("commit called on trie with nil database")
 	}
-	t.commitPruningMarks()
+	// t.commitPruningMarks()
 	hash, cached := t.hashRoot(t.db, onleaf)
 	t.root = cached
 	return hash, nil
@@ -623,14 +624,25 @@ func (t *Trie) markPrunableNode(n node) {
 	}
 }
 
+func (t *Trie) GetPruningMarks() []database.PruningMark {
+	copied := make([]database.PruningMark, len(t.pruningMarksCache))
+	idx := 0
+	for hash, blockNum := range t.pruningMarksCache {
+		copied[idx] = database.PruningMark{Number: blockNum, Hash: hash}
+		idx += 1
+	}
+	t.pruningMarksCache = make(map[common.ExtHash]uint64)
+	return copied
+}
+
 // commitPruningMarks writes all the pruning marks
 func (t *Trie) commitPruningMarks() {
 	if len(t.pruningMarksCache) > 0 {
-		t.db.lock.Lock()
+		// t.db.lock.Lock()
 		for hash, blockNum := range t.pruningMarksCache {
 			t.db.insertPruningMark(hash, blockNum)
 		}
-		t.db.lock.Unlock()
+		// t.db.lock.Unlock()
 
 		t.pruningMarksCache = make(map[common.ExtHash]uint64)
 	}

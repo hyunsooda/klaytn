@@ -805,8 +805,8 @@ func (db *Database) Cap(limit common.StorageSize) error {
 		db.diskDB.WritePreimages(0, db.preimages)
 		numPreimages = len(db.preimages)
 	}
-	pruningMarks := copyPruningMarks(db.pruningMarks)
-	go db.diskDB.WritePruningMarks(pruningMarks)
+	// pruningMarks := copyPruningMarks(db.pruningMarks)
+	// go db.diskDB.WritePruningMarks(pruningMarks)
 	numPruningMarks := len(db.pruningMarks)
 
 	// Keep committing nodes from the flush-list until we're below allowance
@@ -960,8 +960,10 @@ func (db *Database) Commit(root common.Hash, report bool, blockNum uint64) error
 	commitStart := time.Now()
 	db.diskDB.WritePreimages(0, db.preimages)
 
-	pruningMarks := copyPruningMarks(db.pruningMarks)
-	go db.diskDB.WritePruningMarks(pruningMarks)
+	// {
+	// 	pruningMarks := copyPruningMarks(db.pruningMarks)
+	// 	go db.diskDB.WritePruningMarks(pruningMarks)
+	// }
 
 	numPreimages := len(db.preimages)
 	numPruningMarks := len(db.pruningMarks)

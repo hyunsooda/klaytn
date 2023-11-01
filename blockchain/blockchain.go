@@ -141,6 +141,11 @@ type gcBlock struct {
 	blockNum uint64
 }
 
+type PruningNotice struct {
+	pruningNumber uint64
+	pruningMarks  []database.PruningMark
+}
+
 // BlockChain represents the canonical chain given a database with a genesis
 // block. The Blockchain manages chain imports, reverts, chain reorganisations.
 //
@@ -163,7 +168,7 @@ type BlockChain struct {
 	snaps   *snapshot.Tree     // Snapshot tree for fast trie leaf access
 	triegc  *prque.Prque       // Priority queue mapping block numbers to tries to gc
 	chBlock chan gcBlock       // chPushBlockGCPrque is a channel for delivering the gc item to gc loop.
-	chPrune chan uint64        // chPrune is a channel for delivering the current block number for pruning loop.
+	chPrune chan PruningNotice // chPrune is a channel for delivering the current block number for pruning loop.
 
 	hc            *HeaderChain
 	rmLogsFeed    event.Feed
@@ -251,8 +256,8 @@ func NewBlockChain(db database.DBManager, cacheConfig *CacheConfig, chainConfig 
 		cacheConfig:        cacheConfig,
 		db:                 db,
 		triegc:             prque.New(),
-		chBlock:            make(chan gcBlock, 2048), // downloader.maxResultsProcess
-		chPrune:            make(chan uint64, 2048),  // downloader.maxResultsProcess
+		chBlock:            make(chan gcBlock, 2048),       // downloader.maxResultsProcess
+		chPrune:            make(chan PruningNotice, 2048), // downloader.maxResultsProcess
 		stateCache:         state.NewDatabaseWithNewCache(db, cacheConfig.TrieNodeCacheConfig),
 		quit:               make(chan struct{}),
 		futureBlocks:       futureBlocks,
@@ -1327,7 +1332,7 @@ func (bc *BlockChain) writeStateTrie(block *types.Block, state *state.StateDB) e
 		bc.lastCommittedBlock = block.NumberU64()
 
 		if bc.IsLivePruningRequired() {
-			bc.chPrune <- block.NumberU64()
+			bc.chPrune <- PruningNotice{block.NumberU64(), state.GetPruningMarks()}
 		}
 	} else {
 		// Full but not archive node, do proper garbage collection
@@ -1365,7 +1370,7 @@ func (bc *BlockChain) writeStateTrie(block *types.Block, state *state.StateDB) e
 			bc.lastCommittedBlock = block.NumberU64()
 
 			if bc.IsLivePruningRequired() {
-				bc.chPrune <- block.NumberU64()
+				bc.chPrune <- PruningNotice{block.NumberU64(), state.GetPruningMarks()}
 			}
 		}
 
@@ -1437,14 +1442,16 @@ func (bc *BlockChain) pruneTrieNodeLoop() {
 		defer bc.wg.Done()
 		for {
 			select {
-			case num := <-bc.chPrune:
+			case pruningNotice := <-bc.chPrune:
+				num := pruningNotice.pruningNumber
 				if num <= bc.cacheConfig.LivePruningRetention {
 					continue
 				}
 				limit := num - bc.cacheConfig.LivePruningRetention // Prune [1, latest - retention]
 
 				startTime := time.Now()
-				marks := bc.db.ReadPruningMarks(startNum, limit+1)
+				// marks := bc.db.ReadPruningMarks(startNum, limit+1)
+				marks := pruningNotice.pruningMarks
 				bc.db.PruneTrieNodes(marks)
 				bc.db.DeletePruningMarks(marks)
 
