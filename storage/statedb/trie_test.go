@@ -30,6 +30,7 @@ import (
 	"reflect"
 	"testing"
 	"testing/quick"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/klaytn/klaytn/blockchain/types/account"
@@ -390,6 +391,7 @@ func TestPruningByUpdate(t *testing.T) {
 		{Number: 1, Hash: nodehash1},
 		{Number: 1, Hash: nodehash2},
 	}
+	time.Sleep(100 * time.Millisecond) // Give some time wrtie until goroutine succesfully finished
 	marks := dbm.ReadPruningMarks(0, 0)
 	assert.Equal(t, expectedMarks, marks)
 
@@ -437,6 +439,7 @@ func TestPruningByDelete(t *testing.T) {
 		{Number: 1, Hash: nodehash1},
 		{Number: 1, Hash: nodehash2},
 	}
+	time.Sleep(100 * time.Millisecond) // Give some time wrtie until goroutine succesfully finished
 	marks := dbm.ReadPruningMarks(0, 0)
 	assert.Equal(t, expectedMarks, marks)
 

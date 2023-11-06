@@ -626,12 +626,9 @@ func (t *Trie) markPrunableNode(n node) {
 // commitPruningMarks writes all the pruning marks
 func (t *Trie) commitPruningMarks() {
 	if len(t.pruningMarksCache) > 0 {
-		t.db.lock.Lock()
 		for hash, blockNum := range t.pruningMarksCache {
 			t.db.insertPruningMark(hash, blockNum)
 		}
-		t.db.lock.Unlock()
-
 		t.pruningMarksCache = make(map[common.ExtHash]uint64)
 	}
 }
