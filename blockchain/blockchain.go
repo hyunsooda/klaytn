@@ -1477,6 +1477,17 @@ func (bc *BlockChain) pruneTrieNodeLoop() {
 	startNum := uint64(1)
 	pruningInterval := uint64(0)
 
+	delFn := func(l, num uint64) {
+		startTime := time.Now()
+		marks := bc.db.ReadPruningMarks(startNum, l+1)
+		bc.db.PruneTrieNodes(marks)
+		bc.db.DeletePruningMarks(marks)
+		bc.db.WriteLastPrunedBlockNumber(l)
+		logger.Info("Pruned trie nodes", "number", num, "start", startNum, "limit", l,
+			"count", len(marks), "elapsed", time.Since(startTime))
+		startNum = l + 1
+	}
+
 	bc.wg.Add(1)
 	go func() {
 		defer bc.wg.Done()
@@ -1492,16 +1503,11 @@ func (bc *BlockChain) pruneTrieNodeLoop() {
 				}
 				limit := num - bc.cacheConfig.LivePruningRetention // Prune [1, latest - retention]
 
-				go func(l uint64) {
-					startTime := time.Now()
-					marks := bc.db.ReadPruningMarks(startNum, l+1)
-					bc.db.PruneTrieNodes(marks)
-					bc.db.DeletePruningMarks(marks)
-					bc.db.WriteLastPrunedBlockNumber(l)
-					logger.Info("Pruned trie nodes", "number", num, "start", startNum, "limit", l,
-						"count", len(marks), "elapsed", time.Since(startTime))
-					startNum = l + 1
-				}(limit)
+				if bc.cacheConfig.LivePruningDBOPInterval == 1 {
+					delFn(limit, num)
+				} else {
+					go delFn(limit, num)
+				}
 
 				// startTime := time.Now()
 				// marks := bc.db.ReadPruningMarks(startNum, limit+1)
@@ -1513,7 +1519,6 @@ func (bc *BlockChain) pruneTrieNodeLoop() {
 				// 	"count", len(marks), "elapsed", time.Since(startTime))
 
 				// startNum = limit + 1
-				// pruningInterval = 0
 			case <-bc.quit:
 				return
 			}
