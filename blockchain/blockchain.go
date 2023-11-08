@@ -1477,16 +1477,16 @@ func (bc *BlockChain) pruneTrieNodeLoop() {
 	startNum := uint64(1)
 	pruningInterval := uint64(0)
 
-	delFn := func(l, num uint64) {
-		startTime := time.Now()
-		marks := bc.db.ReadPruningMarks(startNum, l+1)
-		bc.db.PruneTrieNodes(marks)
-		bc.db.DeletePruningMarks(marks)
-		bc.db.WriteLastPrunedBlockNumber(l)
-		logger.Info("Pruned trie nodes", "number", num, "start", startNum, "limit", l,
-			"count", len(marks), "elapsed", time.Since(startTime))
-		startNum = l + 1
-	}
+	// 	delFn := func(l, num uint64) {
+	// 		startTime := time.Now()
+	// 		marks := bc.db.ReadPruningMarks(startNum, l+1)
+	// 		bc.db.PruneTrieNodes(marks)
+	// 		bc.db.DeletePruningMarks(marks)
+	// 		bc.db.WriteLastPrunedBlockNumber(l)
+	// 		logger.Info("Pruned trie nodes", "number", num, "start", startNum, "limit", l,
+	// 			"count", len(marks), "elapsed", time.Since(startTime))
+	// 		startNum = l + 1
+	// 	}
 
 	bc.wg.Add(1)
 	go func() {
@@ -1502,23 +1502,24 @@ func (bc *BlockChain) pruneTrieNodeLoop() {
 					continue
 				}
 				limit := num - bc.cacheConfig.LivePruningRetention // Prune [1, latest - retention]
+				// delFn(limit, num)
 
-				if bc.cacheConfig.LivePruningDBOPInterval == 1 {
-					delFn(limit, num)
-				} else {
-					go delFn(limit, num)
-				}
+				// if bc.cacheConfig.LivePruningDBOPInterval == 1 {
+				// 	delFn(limit, num)
+				// } else {
+				// 	go delFn(limit, num)
+				// }
 
-				// startTime := time.Now()
-				// marks := bc.db.ReadPruningMarks(startNum, limit+1)
-				// bc.db.PruneTrieNodes(marks)
-				// bc.db.DeletePruningMarks(marks)
-				// bc.db.WriteLastPrunedBlockNumber(limit)
+				startTime := time.Now()
+				marks := bc.db.ReadPruningMarks(startNum, limit+1)
+				bc.db.PruneTrieNodes(marks)
+				bc.db.DeletePruningMarks(marks)
+				bc.db.WriteLastPrunedBlockNumber(limit)
 
-				// logger.Info("Pruned trie nodes", "number", num, "start", startNum, "limit", limit,
-				// 	"count", len(marks), "elapsed", time.Since(startTime))
+				logger.Info("Pruned trie nodes", "number", num, "start", startNum, "limit", limit,
+					"count", len(marks), "elapsed", time.Since(startTime))
 
-				// startNum = limit + 1
+				startNum = limit + 1
 			case <-bc.quit:
 				return
 			}
