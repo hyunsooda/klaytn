@@ -107,10 +107,11 @@ const (
 )
 
 const (
-	DefaultTriesInMemory        = 128
-	DefaultBlockInterval        = 128
-	DefaultLivePruningRetention = 172800 // 2*params.DefaultStakeUpdateInterval
-	MaxPrefetchTxs              = 20000
+	DefaultTriesInMemory           = 128
+	DefaultBlockInterval           = 128
+	DefaultLivePruningRetention    = 172800 // 2*params.DefaultStakeUpdateInterval
+	DefaultLivePruningIntervalDBOP = 1
+	MaxPrefetchTxs                 = 20000
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	// Changelog:
@@ -124,15 +125,16 @@ const (
 // 2) trie caching/pruning resident in a blockchain.
 type CacheConfig struct {
 	// TODO-Klaytn-Issue1666 Need to check the benefit of trie caching.
-	ArchiveMode          bool                         // If true, state trie is not pruned and always written to database
-	CacheSize            int                          // Size of in-memory cache of a trie (MiB) to flush matured singleton trie nodes to disk
-	BlockInterval        uint                         // Block interval to flush the trie. Each interval state trie will be flushed into disk
-	TriesInMemory        uint64                       // Maximum number of recent state tries according to its block number
-	LivePruningRetention uint64                       // Number of blocks before trie nodes in pruning marks to be deleted. If zero, obsolete nodes are not deleted.
-	SenderTxHashIndexing bool                         // Enables saving senderTxHash to txHash mapping information to database and cache
-	TrieNodeCacheConfig  *statedb.TrieNodeCacheConfig // Configures trie node cache
-	SnapshotCacheSize    int                          // Memory allowance (MB) to use for caching snapshot entries in memory
-	SnapshotAsyncGen     bool                         // Enables snapshot data generation asynchronously
+	ArchiveMode             bool                         // If true, state trie is not pruned and always written to database
+	CacheSize               int                          // Size of in-memory cache of a trie (MiB) to flush matured singleton trie nodes to disk
+	BlockInterval           uint                         // Block interval to flush the trie. Each interval state trie will be flushed into disk
+	TriesInMemory           uint64                       // Maximum number of recent state tries according to its block number
+	LivePruningRetention    uint64                       // Number of blocks before trie nodes in pruning marks to be deleted. If zero, obsolete nodes are not deleted.
+	LivePruningDBOPInterval uint64                       // Performs pruning DB operations by given interval (the higher value gains performance benefit, while the lower value gains keeps pruned size within a less boundary)
+	SenderTxHashIndexing    bool                         // Enables saving senderTxHash to txHash mapping information to database and cache
+	TrieNodeCacheConfig     *statedb.TrieNodeCacheConfig // Configures trie node cache
+	SnapshotCacheSize       int                          // Memory allowance (MB) to use for caching snapshot entries in memory
+	SnapshotAsyncGen        bool                         // Enables snapshot data generation asynchronously
 }
 
 // gcBlock is used for priority queue for GC.
@@ -227,14 +229,15 @@ type prefetchTx struct {
 func NewBlockChain(db database.DBManager, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config) (*BlockChain, error) {
 	if cacheConfig == nil {
 		cacheConfig = &CacheConfig{
-			ArchiveMode:          false,
-			CacheSize:            512,
-			BlockInterval:        DefaultBlockInterval,
-			TriesInMemory:        DefaultTriesInMemory,
-			LivePruningRetention: DefaultLivePruningRetention,
-			TrieNodeCacheConfig:  statedb.GetEmptyTrieNodeCacheConfig(),
-			SnapshotCacheSize:    512,
-			SnapshotAsyncGen:     true,
+			ArchiveMode:             false,
+			CacheSize:               512,
+			BlockInterval:           DefaultBlockInterval,
+			TriesInMemory:           DefaultTriesInMemory,
+			LivePruningRetention:    DefaultLivePruningRetention,
+			LivePruningDBOPInterval: DefaultLivePruningIntervalDBOP,
+			TrieNodeCacheConfig:     statedb.GetEmptyTrieNodeCacheConfig(),
+			SnapshotCacheSize:       512,
+			SnapshotAsyncGen:        true,
 		}
 	}
 
@@ -1472,6 +1475,7 @@ func (bc *BlockChain) pruneTrieNodeLoop() {
 	// ReadPruningMarks(1, limit) is very slow because it iterates over the most of MiscDB.
 	// ReadPruningMarks(start, limit) is much faster because it only iterates a small range.
 	startNum := uint64(1)
+	pruningInterval := uint64(0)
 
 	bc.wg.Add(1)
 	go func() {
@@ -1480,6 +1484,10 @@ func (bc *BlockChain) pruneTrieNodeLoop() {
 			select {
 			case num := <-bc.chPrune:
 				if num <= bc.cacheConfig.LivePruningRetention {
+					continue
+				}
+				pruningInterval++
+				if pruningInterval%bc.cacheConfig.LivePruningDBOPInterval != 0 {
 					continue
 				}
 				limit := num - bc.cacheConfig.LivePruningRetention // Prune [1, latest - retention]

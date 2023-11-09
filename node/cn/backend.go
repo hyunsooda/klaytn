@@ -254,15 +254,16 @@ func New(ctx *node.ServiceContext, config *Config) (*CN, error) {
 	var (
 		vmConfig    = config.getVMConfig()
 		cacheConfig = &blockchain.CacheConfig{
-			ArchiveMode:          config.NoPruning,
-			CacheSize:            config.TrieCacheSize,
-			BlockInterval:        config.TrieBlockInterval,
-			TriesInMemory:        config.TriesInMemory,
-			LivePruningRetention: config.LivePruningRetention,
-			TrieNodeCacheConfig:  &config.TrieNodeCacheConfig,
-			SenderTxHashIndexing: config.SenderTxHashIndexing,
-			SnapshotCacheSize:    config.SnapshotCacheSize,
-			SnapshotAsyncGen:     config.SnapshotAsyncGen,
+			ArchiveMode:             config.NoPruning,
+			CacheSize:               config.TrieCacheSize,
+			BlockInterval:           config.TrieBlockInterval,
+			TriesInMemory:           config.TriesInMemory,
+			LivePruningRetention:    config.LivePruningRetention,
+			LivePruningDBOPInterval: config.LivePruningIntervalDBOPInterval,
+			TrieNodeCacheConfig:     &config.TrieNodeCacheConfig,
+			SenderTxHashIndexing:    config.SenderTxHashIndexing,
+			SnapshotCacheSize:       config.SnapshotCacheSize,
+			SnapshotAsyncGen:        config.SnapshotAsyncGen,
 		}
 	)
 
