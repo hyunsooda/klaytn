@@ -1953,7 +1953,16 @@ func (dbm *databaseManager) DeletePruningEnabled() {
 func (dbm *databaseManager) WritePruningMarks(marks []PruningMark) {
 	batch := dbm.NewBatch(MiscDB)
 	defer batch.Release()
+
+	dupCheck := make(map[common.ExtHash]bool)
+	m := make([]PruningMark, 0, len(marks))
 	for _, mark := range marks {
+		if !dupCheck[mark.Hash] {
+			m = append(m, mark)
+			dupCheck[mark.Hash] = true
+		}
+	}
+	for _, mark := range m {
 		if err := batch.Put(pruningMarkKey(mark), pruningMarkValue); err != nil {
 			logger.Crit("Failed to store trie pruning mark", "err", err)
 		}
