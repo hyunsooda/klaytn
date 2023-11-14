@@ -27,6 +27,7 @@ import (
 
 	"github.com/klaytn/klaytn/common"
 	"github.com/klaytn/klaytn/crypto"
+	"github.com/klaytn/klaytn/storage/database"
 )
 
 var (
@@ -645,4 +646,29 @@ func GetHashAndHexKey(key []byte) ([]byte, []byte) {
 	returnHasherToPool(h)
 	hexKey := keybytesToHex(hashKey)
 	return hashKey, hexKey
+}
+
+func (t *Trie) GetPruningMarks(from, to uint64) []database.PruningMark {
+	t.db.lock.Lock()
+	defer t.db.lock.Unlock()
+
+	totalLen := 0
+	for i := from; i <= to; i++ {
+		totalLen += len(t.db.pruningMarks[i])
+	}
+	copied := make([]database.PruningMark, 0, totalLen)
+	for i := from; i <= to; i++ {
+		for _, hash := range t.db.pruningMarks[i] {
+			copied = append(copied, database.PruningMark{Number: i, Hash: hash})
+		}
+		delete(t.db.pruningMarks, i)
+	}
+	return copied
+
+	// copied := make([]database.PruningMark, len(t.db.pruningMarks))
+	// for idx, mark := range t.db.pruningMarks {
+	// 	copied[idx] = database.PruningMark{Number: mark.Number, Hash: mark.Hash}
+	// }
+	// t.db.pruningMarks = []database.PruningMark{}
+	// return copied
 }

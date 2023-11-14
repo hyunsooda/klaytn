@@ -91,8 +91,9 @@ type Database struct {
 	oldest common.ExtHash                 // Oldest tracked node, flush-list head
 	newest common.ExtHash                 // Newest tracked node, flush-list tail
 
-	preimages    map[common.Hash][]byte // Preimages of nodes from the secure trie
-	pruningMarks []database.PruningMark // Trie node pruning marks from the pruning trie
+	preimages map[common.Hash][]byte // Preimages of nodes from the secure trie
+	// pruningMarks []database.PruningMark // Trie node pruning marks from the pruning trie
+	pruningMarks map[uint64][]common.ExtHash // Trie node pruning marks from the pruning trie
 
 	gctime  time.Duration      // Time spent on garbage collection since last commit
 	gcnodes uint64             // Nodes garbage collected since last commit
@@ -312,6 +313,7 @@ func NewDatabaseWithNewCache(diskDB database.DBManager, cacheConfig *TrieNodeCac
 		diskDB:              diskDB,
 		nodes:               map[common.ExtHash]*cachedNode{{}: {}},
 		preimages:           make(map[common.Hash][]byte),
+		pruningMarks:        make(map[uint64][]common.ExtHash),
 		trieNodeCache:       trieNodeCache,
 		trieNodeCacheConfig: cacheConfig,
 	}
@@ -325,6 +327,7 @@ func NewDatabaseWithExistingCache(diskDB database.DBManager, cache TrieNodeCache
 		diskDB:        diskDB,
 		nodes:         map[common.ExtHash]*cachedNode{{}: {}},
 		preimages:     make(map[common.Hash][]byte),
+		pruningMarks:  make(map[uint64][]common.ExtHash),
 		trieNodeCache: cache,
 	}
 }
@@ -465,10 +468,12 @@ func (db *Database) insertPreimage(hash common.Hash, preimage []byte) {
 // insertPruningMark writes a new pruning mark to the memory database.
 // Note, this method assumes that the database's lock is held!
 func (db *Database) insertPruningMark(hash common.ExtHash, blockNum uint64) {
-	db.pruningMarks = append(db.pruningMarks, database.PruningMark{
-		Number: blockNum,
-		Hash:   hash,
-	})
+	// db.pruningMarks = append(db.pruningMarks, database.PruningMark{
+	// 	Number: blockNum,
+	// 	Hash:   hash,
+	// })
+
+	db.pruningMarks[blockNum] = append(db.pruningMarks[blockNum], hash)
 }
 
 // getCachedNode finds an encoded node in the trie node cache if enabled.
@@ -768,7 +773,6 @@ func (db *Database) Cap(limit common.StorageSize) error {
 		db.diskDB.WritePreimages(0, db.preimages)
 		numPreimages = len(db.preimages)
 	}
-	db.diskDB.WritePruningMarks(db.pruningMarks)
 	numPruningMarks := len(db.pruningMarks)
 
 	// Keep committing nodes from the flush-list until we're below allowance
@@ -810,7 +814,7 @@ func (db *Database) Cap(limit common.StorageSize) error {
 		db.preimages = make(map[common.Hash][]byte)
 		db.preimagesSize = 0
 	}
-	db.pruningMarks = []database.PruningMark{}
+	// db.pruningMarks = []database.PruningMark{}
 
 	for db.oldest != oldest {
 		node := db.nodes[db.oldest]
@@ -913,7 +917,6 @@ func (db *Database) Commit(root common.Hash, report bool, blockNum uint64) error
 
 	commitStart := time.Now()
 	db.diskDB.WritePreimages(0, db.preimages)
-	db.diskDB.WritePruningMarks(db.pruningMarks)
 	numPreimages := len(db.preimages)
 	numPruningMarks := len(db.pruningMarks)
 
@@ -932,7 +935,7 @@ func (db *Database) Commit(root common.Hash, report bool, blockNum uint64) error
 
 	db.preimages = make(map[common.Hash][]byte)
 	db.preimagesSize = 0
-	db.pruningMarks = []database.PruningMark{}
+	// db.pruningMarks = []database.PruningMark{}
 
 	uncacheStart := time.Now()
 	db.uncache(hash)

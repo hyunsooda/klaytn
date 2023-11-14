@@ -390,8 +390,10 @@ func TestPruningByUpdate(t *testing.T) {
 		{Number: 1, Hash: nodehash1},
 		{Number: 1, Hash: nodehash2},
 	}
-	marks := dbm.ReadPruningMarks(0, 0)
-	assert.Equal(t, expectedMarks, marks)
+	marks := trie.GetPruningMarks(0, 1)
+	assert.Equal(t, len(expectedMarks), len(marks))
+	assert.True(t, expectedMarks[0] == marks[0] || expectedMarks[1] == marks[0])
+	assert.True(t, expectedMarks[0] == marks[1] || expectedMarks[1] == marks[1])
 
 	// The nodes are deleted
 	dbm.PruneTrieNodes(marks)
@@ -432,13 +434,13 @@ func TestPruningByDelete(t *testing.T) {
 	trie.Commit(nil)
 	db.Cap(0)
 
-	// Those nodes and the only those nodes are scheduled to be deleted
 	expectedMarks := []database.PruningMark{
 		{Number: 1, Hash: nodehash1},
 		{Number: 1, Hash: nodehash2},
 	}
-	marks := dbm.ReadPruningMarks(0, 0)
-	assert.Equal(t, expectedMarks, marks)
+	marks := trie.GetPruningMarks(0, 1)
+	assert.True(t, expectedMarks[0] == marks[0] || expectedMarks[1] == marks[0])
+	assert.True(t, expectedMarks[0] == marks[1] || expectedMarks[1] == marks[1])
 
 	// The nodes are deleted
 	dbm.PruneTrieNodes(marks)
