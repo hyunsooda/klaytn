@@ -335,23 +335,20 @@ func NewDatabaseWithExistingCache(diskDB database.DBManager, cache TrieNodeCache
 
 func getTrieNodeCacheSizeMiB() int {
 	totalPhysicalMemMiB := float64(memory.TotalMemory() / 1024 / 1024)
-	fmt.Println("CACHE", int(totalPhysicalMemMiB*0.15))
-	return int(totalPhysicalMemMiB * 0.15)
 
-	/*
-		if totalPhysicalMemMiB < 10*1024 {
-			return 0
-		} else if totalPhysicalMemMiB < 20*1024 {
-			return 1 * 1024 // allocate 1G for small memory
-		}
+	if totalPhysicalMemMiB < 10*1024 {
+		return 0
+	} else if totalPhysicalMemMiB < 20*1024 {
+		return 1 * 1024 // allocate 1G for small memory
+	}
 
-		memoryScalePercent := 0.3 // allocate 30% for 20 < mem < 100
-		if totalPhysicalMemMiB > 100*1024 {
-			memoryScalePercent = 0.35 // allocate 35% for 100 < mem
-		}
-
-		return int(totalPhysicalMemMiB * memoryScalePercent)
-	*/
+	// memoryScalePercent := 0.3 // allocate 30% for 20 < mem < 100
+	// if totalPhysicalMemMiB > 100*1024 {
+	// 	memoryScalePercent = 0.35 // allocate 35% for 100 < mem
+	// }
+	memoryScalePercent := 0.15
+	fmt.Println("CACHE", int(totalPhysicalMemMiB*memoryScalePercent))
+	return int(totalPhysicalMemMiB * memoryScalePercent)
 }
 
 // DiskDB retrieves the persistent database backing the trie database.
