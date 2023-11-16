@@ -346,7 +346,7 @@ func getTrieNodeCacheSizeMiB() int {
 	// if totalPhysicalMemMiB > 100*1024 {
 	// 	memoryScalePercent = 0.35 // allocate 35% for 100 < mem
 	// }
-	memoryScalePercent := 0
+	memoryScalePercent := float64(0)
 	fmt.Println("CACHE", int(totalPhysicalMemMiB*memoryScalePercent))
 	return int(totalPhysicalMemMiB * memoryScalePercent)
 }
