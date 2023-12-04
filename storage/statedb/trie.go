@@ -614,18 +614,25 @@ func (t *Trie) markPrunableNode(n node) {
 		// If a node exists as a hashNode, it means the node is either:
 		// (1) lives in database but yet to be resolved - subject to pruning,
 		// (2) collapsed by Hash or Commit - may or may not be in database, add the mark anyway.
-		t.pruningMarksCache[common.BytesToExtHash(hn)] = t.PruningBlockNumber
+		h := common.BytesToExtHash(hn)
+		if t.isPrunable(h) {
+			t.pruningMarksCache[h] = t.PruningBlockNumber
+		}
 	} else if hn, _ := n.cache(); hn != nil {
 		// If node.flags.hash is nonempty, it means the node is either:
 		// (1) loaded from databas - subject to pruning,
 		// (2) went through hasher by Hash or Commit - may or may not be in database, add the mark anyway.
 		h := common.BytesToExtHash(hn)
-		if !h.IsZeroExtended() || t.originalRoot == h {
-			// (1) Remove a obsolete child node that is unique nonzero-extended)
-			// (2) Remove a obsolete root node that is always zero-extended
+		if t.isPrunable(h) {
 			t.pruningMarksCache[h] = t.PruningBlockNumber
 		}
 	}
+}
+
+func (t *Trie) isPrunable(h common.ExtHash) bool {
+	// (1) Can be removed a obsolete child node that is unique nonzero-extended)
+	// (2) Can be removed a obsolete root node that is always zero-extended
+	return !h.IsZeroExtended() || t.originalRoot == h
 }
 
 // commitPruningMarks writes all the pruning marks
