@@ -309,6 +309,9 @@ type DBManager interface {
 
 	Stat(string) (string, error)
 	Compact([]byte, []byte) error
+
+	CollectPreimages(cb func(common.Hash) []byte) map[common.Hash][]byte
+	Test1234(cb func(common.Hash) []byte) uint64
 }
 
 type DBEntryType uint8
@@ -3041,4 +3044,39 @@ func deleteSnapshotRecoveryNumber(db KeyValueWriter) {
 	if err := db.Delete(snapshotRecoveryKey); err != nil {
 		logger.Crit("Failed to remove snapshot recovery number", "err", err)
 	}
+}
+
+func (dbm *databaseManager) CollectPreimages(cb func(common.Hash) []byte) map[common.Hash][]byte {
+	var (
+		db        = dbm.getDatabase(StateTrieDB)
+		startKey  = common.Hex2Bytes("0x0000000000000000000000000000000000000000000")
+		it        = db.NewIterator(preimagePrefix, startKey)
+		preimages = make(map[common.Hash][]byte)
+	)
+	defer it.Release()
+
+	for it.Next() {
+		k := common.BytesToHash(it.Key()[len(preimagePrefix):])
+		preimages[k] = cb(k)
+	}
+	return preimages
+}
+
+func (dbm *databaseManager) Test1234(cb func(common.Hash) []byte) uint64 {
+	var (
+		db        = dbm.getDatabase(StateTrieDB)
+		startKey  = common.Hex2Bytes("0x0000000000000000000000000000000000000000000")
+		it        = db.NewIterator(preimagePrefix, startKey)
+		preimages = make(map[common.Hash][]byte)
+		kvSize    = uint64(0)
+	)
+	defer it.Release()
+
+	for it.Next() {
+		k := common.BytesToHash(it.Key()[len(preimagePrefix):])
+		preimages[k] = cb(k)
+		kvSize += uint64(len(k) + len(preimages[k]))
+
+	}
+	return kvSize
 }

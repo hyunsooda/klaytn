@@ -819,6 +819,11 @@ web3._extend({
 			params: 5,
 		}),
 		new web3._extend.Method({
+			name: 'test1234',
+			call: 'debug_test1234',
+			params: 0,
+		}),
+		new web3._extend.Method({
 			name: 'setVMLogTarget',
 			call: 'debug_setVMLogTarget',
 			params: 1

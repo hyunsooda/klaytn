@@ -424,6 +424,17 @@ type storageEntry struct {
 	Value common.Hash  `json:"value"`
 }
 
+func (api *PrivateDebugAPI) Test1234(ctx context.Context) (uint64, error) {
+	block := api.cn.blockchain.CurrentBlock()
+	if block == nil {
+		return 0, fmt.Errorf("block not found")
+	}
+	size := api.cn.chainDB.Test1234(func(k common.Hash) []byte {
+		return api.cn.blockchain.StateCache().TrieDB().Preimage(k)
+	})
+	return size, nil
+}
+
 // StorageRangeAt returns the storage at the given block height and transaction index.
 func (api *PrivateDebugAPI) StorageRangeAt(ctx context.Context, blockHash common.Hash, txIndex int, contractAddress common.Address, keyStart hexutil.Bytes, maxResult int) (StorageRangeResult, error) {
 	// Retrieve the block
