@@ -142,7 +142,7 @@ abstract contract IBridge is EnumerableSetUpgradable {
     event BridgeResume(string indexed msg);
 
     //////////////////// Exported functions ////////////////////
-    /// @dev A gateway function that triggers tokwn swap between FNSA and KLAY
+    /// @dev A gateway function that triggers token swap between FNSA and KAIA
     /// @param prov Burning provision
     function provision(ProvisionData calldata prov) external virtual;
 
