@@ -1,6 +1,10 @@
 import { expect } from "chai";
-import { DAY, WEEK, YEAR, setBlockTimestamp, getBalance } from "./util";
+import { addTime, getBalance } from "../../test/common/helper";
 const { time } = require('@nomicfoundation/hardhat-network-helpers');
+
+const DAY = 24 * 60 * 60;
+const WEEK = 7 * DAY;
+const YEAR = 365 * DAY;
 
 describe("[Bridge Test]", function () {
   let bridge;
@@ -196,15 +200,15 @@ describe("[Bridge Test]", function () {
 
     const mintLock = Number(await bridge.TRANSFERLOCK());
     let setTime = mintLock - 2;
-    setBlockTimestamp(setTime);
+    await addTime(setTime);
     await expect(bridge.requestClaim(seq))
       .to.be.revertedWith("PDT::Bridge: TimeLock duration is not passed over")
-    expect(await getBalance(receiver)).to.equal(0);
+    expect(await getBalance(receiver)).to.equal(0n);
 
     setTime = mintLock;
-    setBlockTimestamp(setTime);
+    await addTime(setTime);
     await bridge.requestClaim(seq);
-    expect(await getBalance(receiver)).to.equal(amount);
+    expect(await getBalance(receiver)).to.equal(BigInt(amount));
   });
 
   it("#authroization test - provision", async function () {
@@ -249,7 +253,7 @@ describe("[Bridge Test]", function () {
     await operator.connect(operator3).confirmTransaction(txID);
 
     const mintLock = Number(await bridge.TRANSFERLOCK());
-    await setBlockTimestamp(mintLock);
+    await addTime(mintLock);
     await bridge.requestClaim(seq);
     await expect(bridge.requestClaim(seq))
       .to.be.revertedWith("PDT::Bridge: A provision corresponding the given sequence was already claimed");
@@ -257,7 +261,7 @@ describe("[Bridge Test]", function () {
 
   it("#transfer test - not verified provision", async function () {
     const mintLock = Number(await bridge.TRANSFERLOCK());
-    await setBlockTimestamp(mintLock);
+    await addTime(mintLock);
     await expect(bridge.requestClaim(seq))
       .to.be.revertedWith("PDT::Bridge: No provisoned for corresponding sequence");
   });
@@ -274,7 +278,7 @@ describe("[Bridge Test]", function () {
 
     const mintLock = Number(await bridge.TRANSFERLOCK());
     const setTime = mintLock;
-    await setBlockTimestamp(setTime);
+    await addTime(setTime);
 
     const gasBig = 30000000;
     const gasSmall = 300000;
@@ -754,7 +758,7 @@ describe("[Bridge Test]", function () {
     expect(await bridge.nClaimed()).to.be.equal(0);
 
     const mintLock = Number(await bridge.TRANSFERLOCK());
-    await setBlockTimestamp(mintLock);
+    await addTime(mintLock);
 
     for (let i=1; i<10; i++) {
       await bridge.requestClaim(i);
@@ -778,7 +782,7 @@ describe("[Bridge Test]", function () {
     expect(await bridge.nClaimed()).to.be.equal(0);
 
     const mintLock = Number(await bridge.TRANSFERLOCK());
-    await setBlockTimestamp(mintLock);
+    await addTime(mintLock);
     await bridge.requestBatchClaim(10);
 
     expect(await bridge.nClaimed()).to.gt(0);
@@ -799,7 +803,7 @@ describe("[Bridge Test]", function () {
     }
 
     const mintLock = Number(await bridge.TRANSFERLOCK());
-    await setBlockTimestamp(mintLock);
+    await addTime(mintLock);
 
     expect(await bridge.getClaimCandidates()).to.deep.equal([1, 4, 2, 5, 3, 6, 7])
     await bridge.requestBatchClaim(3);
@@ -825,7 +829,7 @@ describe("[Bridge Test]", function () {
     }
 
     const mintLock = Number(await bridge.TRANSFERLOCK());
-    await setBlockTimestamp(mintLock);
+    await addTime(mintLock);
 
     // hold seq 15
     const holdSeq = 15;
@@ -866,7 +870,7 @@ describe("[Bridge Test]", function () {
     }
 
     const mintLock = Number(await bridge.TRANSFERLOCK());
-    await setBlockTimestamp(mintLock);
+    await addTime(mintLock);
 
     const receiverBalance = await getBalance(receiver);
 
@@ -874,26 +878,26 @@ describe("[Bridge Test]", function () {
     expect(await bridge.nClaimed()).to.be.equal(0);
     await bridge.requestBatchClaim(1, {gasLimit: 200000})
     expect(await bridge.nClaimed()).to.be.equal(1);
-    expect(await getBalance(receiver)).to.be.equal(Number(receiverBalance) + 1);
+    expect(await getBalance(receiver)).to.be.equal(BigInt(Number(receiverBalance) + 1));
 
     await expect(bridge.requestBatchClaim(5, {gasLimit: 200000}))
       .to.be.reverted;
     expect(await bridge.nClaimed()).to.be.equal(1)
-    expect(await getBalance(receiver)).to.be.equal(Number(receiverBalance) + 1);
+    expect(await getBalance(receiver)).to.be.equal(BigInt(Number(receiverBalance) + 1));
 
     // await bridge.requestBatchClaim(5, {gasLimit: 500000})
     await bridge.requestBatchClaim(5, {gasLimit: 600000})
     expect(await bridge.nClaimed()).to.be.equal(6)
-    expect(await getBalance(receiver)).to.be.equal(Number(receiverBalance) + 6);
+    expect(await getBalance(receiver)).to.be.equal(BigInt(Number(receiverBalance) + 6));
 
     await expect(bridge.requestBatchClaim(10, {gasLimit: 600000}))
       .to.be.reverted;
     expect(await bridge.nClaimed()).to.be.equal(6)
-    expect(await getBalance(receiver)).to.be.equal(Number(receiverBalance) + 6);
+    expect(await getBalance(receiver)).to.be.equal(BigInt(Number(receiverBalance) + 6));
 
     await bridge.requestBatchClaim(10, {gasLimit: 1200000})
     expect(await bridge.nClaimed()).to.be.equal(16)
-    expect(await getBalance(receiver)).to.be.equal(Number(receiverBalance) + 16);
+    expect(await getBalance(receiver)).to.be.equal(BigInt(Number(receiverBalance) + 16));
   });
 
   it("#Confirmed provision (by compromised operator group) can be removed and true provision can be confrimed eventually", async function () {
@@ -1093,7 +1097,7 @@ describe("[Bridge Test]", function () {
 
     const mintLock = Number(await bridge.TRANSFERLOCK());
     const setTime = mintLock;
-    await setBlockTimestamp(setTime);
+    await addTime(setTime);
 
     const gasSmall = 300000;
     for (let i=0; i<maxTryTransfer; i++) {
@@ -1122,13 +1126,13 @@ describe("[Bridge Test]", function () {
     expect(await bridge.getClaimFailures()).to.deep.equal([1])
     newReceiver = "0x0000000000000000000000000000000000000789";
     rawTxData = (await bridge.populateTransaction.resolveUnclaimable(seq, newReceiver)).data;
-    expect(await getBalance(newReceiver)).to.equal(0);
+    expect(await getBalance(newReceiver)).to.equal(0n);
     await guardian.connect(guardian1).submitTransaction(bridge.address, rawTxData, 0);
     await guardian.connect(guardian2).confirmTransaction(guardianTxID + 2);
     await expect(guardian.connect(guardian3).confirmTransaction(guardianTxID + 2))
       .to.emit(bridge, "ProvisionReceiverChanged")
       .to.emit(bridge, "Claim");
-    expect(await getBalance(newReceiver)).to.equal(amount);
+    expect(await getBalance(newReceiver)).to.equal(BigInt(amount));
     expect(await bridge.getClaimFailures()).to.deep.equal([])
     expect(await bridge.getClaimFailuresRange(100)).to.deep.equal([])
   });
