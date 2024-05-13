@@ -27,7 +27,7 @@ abstract contract IJudge {
 
     //////////////////// Modifier ////////////////////
     modifier onlyGuardian() {
-        require(msg.sender == guardian, "PDT::Operator: Sender is not guardian wallet");
+        require(msg.sender == guardian, "PDT::Judge: Sender is not guardian wallet");
         _;
     }
 

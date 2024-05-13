@@ -21,12 +21,11 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "./ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./IOperator.sol";
 import "./IGuardian.sol";
 import "./IBridge.sol";
 
-contract Operator is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable, OwnableUpgradeable, IERC165, IOperator {
+contract Operator is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable, IERC165, IOperator {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() { _disableInitializers(); }
 
@@ -38,7 +37,6 @@ contract Operator is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable,
         public
         initializer
     {
-        __ReentrancyGuard_init();
         require(IERC165(initGuardian).supportsInterface(type(IGuardian).interfaceId), "PDT::Operator: Operator contract address does not implement IGuardian");
 
         for (uint8 i=0; i<initOperators.length; i++) {
@@ -51,11 +49,11 @@ contract Operator is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable,
         // Fill the first index(0) with dummy tx
         addTransaction(address(0), "", 0);
 
-        __Ownable_init();
         __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
     }
 
-    function _authorizeUpgrade(address newImplementation) internal virtual override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal virtual override onlyGuardian {}
 
     function supportsInterface(bytes4 interfaceId) external override pure returns (bool) {
         return interfaceId == type(IOperator).interfaceId;
@@ -155,7 +153,8 @@ contract Operator is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable,
         uint64 txID = 0;
 
         try IBridge(bridge).bytes2Provision(data) returns (IBridge.ProvisionData memory provision) {
-            require(bridge == to, "PDT::Operator: Provision transaction must be targeted to knwon bridge contract address");
+            require(bridge == to, "PDT::Operator: Provision transaction must be targeted to known bridge contract address");
+            require(provision.seq > 0 , "PDT::Operator: Provision sequence number must be greater than zero");
 
             seq = provision.seq;
             bytes32 calldataHash = keccak256(data);
@@ -188,7 +187,7 @@ contract Operator is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable,
         // `provisions[txID]` is set only if the target contract address is bridge
         IBridge.ProvisionData storage provision = provisions[txID];
         if (provision.seq != 0) {
-            setAdd(seq2TxID[provision.seq], txID);
+            EnumerableSetUint64.setAdd(seq2TxID[provision.seq], txID);
             updateGreatestSubmittedSeq(provision.seq);
             emit IBridge.Provision(IBridge.ProvisionIndividualEvent({
                 seq: provision.seq,
@@ -425,7 +424,7 @@ contract Operator is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable,
         uint unsubmittedCnt = 0;
 
         for (uint64 seq=seqFrom; seq<seqTo; seq++) {
-            uint64[] memory txIDs = getAll(seq2TxID[seq]);
+            uint64[] memory txIDs = EnumerableSetUint64.getAll(seq2TxID[seq]);
             uint64 unconfirmedCnt = 0;
             bool txExecuted = false;
 
@@ -440,7 +439,7 @@ contract Operator is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable,
                 }
             }
 
-            bool revoked = setContains(revokedProvisionSeqs, seq);
+            bool revoked = EnumerableSetUint64.setContains(revokedProvisionSeqs, seq);
             if (revoked) {
                 // Condition0: If the sequence was revoked
                 unsubmittedProvisionSeqsTemp[unsubmittedCnt++] = seq;
@@ -461,12 +460,12 @@ contract Operator is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable,
 
     /// @dev See {IOperator-unmarkRevokeSeq}
     function unmarkRevokeSeq(uint64 seq) public override onlyBridge {
-        setRemove(revokedProvisionSeqs, seq);
+        EnumerableSetUint64.setRemove(revokedProvisionSeqs, seq);
     }
 
     /// @dev See {IOperator-markRevokeSeq}
     function markRevokeSeq(uint64 seq) public override onlyBridge {
-        setAdd(revokedProvisionSeqs, seq);
+        EnumerableSetUint64.setAdd(revokedProvisionSeqs, seq);
         emit RevokedProvision(seq);
     }
 
@@ -483,6 +482,11 @@ contract Operator is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable,
 
     /// @dev See {IOperator-getSeq2TxIDs}
     function getSeq2TxIDs(uint64 seq) public override view returns (uint64[] memory) {
-        return getAll(seq2TxID[seq]);
+        return EnumerableSetUint64.getAll(seq2TxID[seq]);
+    }
+
+    /// @dev Return a contract version
+    function getVersion() public pure returns (string memory) {
+        return "0.0.1";
     }
 }

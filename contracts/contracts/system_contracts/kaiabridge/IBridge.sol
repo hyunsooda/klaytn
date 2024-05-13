@@ -17,9 +17,9 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity 0.8.24;
 
-import "./EnumerableSetUpgradable.sol";
+import "./EnumerableSetUint64.sol";
 
-abstract contract IBridge is EnumerableSetUpgradable {
+abstract contract IBridge {
     //////////////////// Struct ////////////////////
     /// @dev ProvisionData struct. This struct is identical with the wasm event struct
     struct ProvisionData {
@@ -59,31 +59,39 @@ abstract contract IBridge is EnumerableSetUpgradable {
     }
 
     modifier onlyOperator {
-        require(operator == msg.sender, "PDT::Manager: Not an operator");
+        require(operator == msg.sender, "PDT::Bridge: Not an operator");
         _;
     }
 
     modifier onlyGuardian {
-        require(guardian == msg.sender, "PDT::Manager: Not an guardian");
+        require(guardian == msg.sender, "PDT::Bridge: Not an guardian");
         _;
     }
 
     modifier onlyJudge {
-        require(judge == msg.sender, "PDT::Manager: Not an judge");
+        require(judge == msg.sender, "PDT::Bridge: Not an judge");
         _;
     }
 
     modifier notPause {
-        require(!pause, "PDT::Manager: Bridge has been paused");
+        require(!pause, "PDT::Bridge: Bridge has been paused");
         _;
     }
 
     modifier inPause {
-        require(pause, "PDT::Manager: Bridge has not been paused");
+        require(pause, "PDT::Bridge: Bridge has not been paused");
+        _;
+    }
+
+    modifier transferEnable {
+        require(transferFromKaiaOn, "PDT::Bridge: Swap reqeust from KAIA is disabled");
         _;
     }
 
     //////////////////// Event ////////////////////
+    /// @dev Emitted when a `transferFromKaiaOn` is changed
+    event TransferFromKaiaOnOffChanged(bool indexed transferFromKaiaOn, bool indexed set);
+
     /// @dev Emitted when a provision is submitted
     event ProvisionConfirm(ProvisionConfirmedEvent indexed provision);
 
@@ -100,10 +108,10 @@ abstract contract IBridge is EnumerableSetUpgradable {
     event Transfer(SwapRequest indexed lockInfo);
 
     /// @dev Emitted when `minLockablePDT` is changed
-    event MintLockablePDTChange(uint256 indexed beforeMintLock, uint256 indexed newMintLock);
+    event MinLockablePDTChange(uint256 indexed beforeMinLock, uint256 indexed newMinLock);
 
     /// @dev Emitted when `maxLockablePDT` is changed
-    event MaxtLockablePDTChange(uint256 indexed beforeMaxtLock, uint256 indexed newMaxtLock);
+    event MaxLockablePDTChange(uint256 indexed beforeMaxLock, uint256 indexed newMaxLock);
 
     /// @dev Emitted when claim is done
     event Claim(ProvisionData indexed provision);
@@ -142,7 +150,11 @@ abstract contract IBridge is EnumerableSetUpgradable {
     event BridgeResume(string indexed msg);
 
     //////////////////// Exported functions ////////////////////
-    /// @dev A gateway function that triggers token swap between FNSA and KAIA
+    /// @dev Set the transferable option from KAIA to FNSA
+    /// @param set Enable transfer function if it is true
+    function changeTransferEnable(bool set) external virtual;
+
+    /// @dev A gateway function that triggers token swap between FNSA and KLAY
     /// @param prov Burning provision
     function provision(ProvisionData calldata prov) external virtual;
 
@@ -190,11 +202,11 @@ abstract contract IBridge is EnumerableSetUpgradable {
 
     /// @dev Update mintLockablePDT with a new value
     /// @param newMinLockablePDT new value of mintLockablePDT
-    function changeMintLockablePDT(uint256 newMinLockablePDT) external virtual;
+    function changeMinLockablePDT(uint256 newMinLockablePDT) external virtual;
 
     /// @dev Update maxtLockablePDT with a new value
     /// @param newMaxLockablePDT new value of maxtLockablePDT
-    function changeMaxtLockablePDT(uint256 newMaxLockablePDT) external virtual;
+    function changeMaxLockablePDT(uint256 newMaxLockablePDT) external virtual;
 
     /// @dev Update bridge address
     /// @param newMaxTryTransfer new value of maxTryTransfer
@@ -259,6 +271,7 @@ abstract contract IBridge is EnumerableSetUpgradable {
     uint256 constant INFINITE = type(uint64).max;
 
     //////////////////// Storage variables ////////////////////
+    bool public transferFromKaiaOn;
     address public operator;
     address public guardian;
     address public judge;

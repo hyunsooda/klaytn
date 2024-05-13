@@ -21,13 +21,12 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "../../system_contracts/kaiabridge/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "../../system_contracts/kaiabridge/IBridge.sol";
 import "../../system_contracts/kaiabridge/IGuardian.sol";
 import "../../system_contracts/kaiabridge/IOperator.sol";
 import "../../system_contracts/kaiabridge/Bech32.sol";
 
-contract NewKAIABridge is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable, OwnableUpgradeable, IERC165, IBridge,  Bech32 {
+contract NewKAIABridge is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable, IERC165, IBridge,  Bech32 {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() { _disableInitializers(); }
 
@@ -37,7 +36,6 @@ contract NewKAIABridge is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrade
     /// @param initJudge Judge contract address
     function initialize(address initOperator, address initGuardian, address initJudge, uint256 newMaxTryTransfer) public initializer {
         require(IERC165(initOperator).supportsInterface(type(IOperator).interfaceId), "PDT::Bridger: Operator contract address does not implement IOperator");
-        __ReentrancyGuard_init();
         greatestConfirmedSeq = 0;
         nProvisioned = 0;
         judge = initJudge;
@@ -53,15 +51,19 @@ contract NewKAIABridge is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrade
         operator = initOperator;
         guardian = initGuardian;
 
-
-        __Ownable_init();
         __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
     }
 
-    function _authorizeUpgrade(address newImplementation) internal virtual override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal virtual override onlyGuardian {}
 
     function supportsInterface(bytes4 interfaceId) external override pure returns (bool) {
         return interfaceId == type(IBridge).interfaceId;
+    }
+
+    function changeTransferEnable(bool set) external override onlyGuardian {
+        emit TransferFromKaiaOnOffChanged(transferFromKaiaOn, set);
+        transferFromKaiaOn = set;
     }
 
     /// @dev See {IBridge-provision}
@@ -77,7 +79,7 @@ contract NewKAIABridge is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrade
         nProvisioned += 1;
         updateGreatestConfirmedSeq(seq);
         setTransferTimeLock(seq, TRANSFERLOCK);
-        setAdd(claimCandidates, seq);
+        EnumerableSetUint64.setAdd(claimCandidates, seq);
         emit ProvisionConfirm(ProvisionConfirmedEvent({
             seq: seq,
             sender: prov.sender,
@@ -96,8 +98,8 @@ contract NewKAIABridge is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrade
         if (success) {
             claimed[seq] = true;
             nClaimed += 1;
-            setRemove(claimCandidates, seq);
-            setRemove(claimFailures, seq);
+            EnumerableSetUint64.setRemove(claimCandidates, seq);
+            EnumerableSetUint64.setRemove(claimFailures, seq);
             return true;
         }
         return false;
@@ -123,13 +125,13 @@ contract NewKAIABridge is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrade
     /// @dev See {IBridge-requestBatchClaim}
     function requestBatchClaim(uint64 range) public override {
         uint256 to = range;
-        uint256 sl = setLength(claimCandidates);
+        uint256 sl = EnumerableSetUint64.setLength(claimCandidates);
         if (range > sl) {
             to = sl;
         }
         uint64 idx = 0;
         for (uint64 i=0; i<to; i++) {
-            if (!requestClaimNoRevert(setAt(claimCandidates, idx), false)) {
+            if (!requestClaimNoRevert(EnumerableSetUint64.setAt(claimCandidates, idx), false)) {
                 idx++;
             }
         }
@@ -142,8 +144,8 @@ contract NewKAIABridge is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrade
         setTransferTimeLock(seq, 0);
         nProvisioned -= 1;
         updateGreatestConfirmedSeq(seq - 1);
-        setRemove(claimCandidates, seq);
-        setRemove(claimFailures, seq);
+        EnumerableSetUint64.setRemove(claimCandidates, seq);
+        EnumerableSetUint64.setRemove(claimFailures, seq);
         transferFail[seq] = 0;
         emit RemoveProvision(provisions[seq]);
         delete provisions[seq];
@@ -155,14 +157,14 @@ contract NewKAIABridge is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrade
         require(isProvisioned(seq), "PDT::Bridge: No provisoned for corresponding sequence");
         require(!claimed[seq], "PDT::Bridge: A provision corresponding the given sequence was already claimed");
         require(isPassedTimeLockDuration(seq), "PDT::Bridge: TimeLock duration is not passed over");
-        require(setContains(claimFailures, seq), "PDT::Bridge: Must be in claim failure set");
+        require(EnumerableSetUint64.setContains(claimFailures, seq), "PDT::Bridge: Must be in claim failure set");
         require(!isContract(newReceiver), "PDT::Bridge: newReceiver must not be contract address");
 
         emit ProvisionReceiverChanged(provisions[seq].receiver, newReceiver);
         provisions[seq].receiver = newReceiver;
         claim(provisions[seq], true);
-        setRemove(claimCandidates, seq);
-        setRemove(claimFailures, seq);
+        EnumerableSetUint64.setRemove(claimCandidates, seq);
+        EnumerableSetUint64.setRemove(claimFailures, seq);
     }
 
     /// @dev Update greatest sequence
@@ -173,15 +175,15 @@ contract NewKAIABridge is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrade
         }
     }
 
-    /// @dev See {IBridge-changeMintLockablePDT}
-    function changeMintLockablePDT(uint256 newMinLockablePDT) public override onlyGuardian {
-        emit MintLockablePDTChange(minLockablePDT, newMinLockablePDT);
+    /// @dev See {IBridge-changeMinLockablePDT}
+    function changeMinLockablePDT(uint256 newMinLockablePDT) public override onlyGuardian {
+        emit MinLockablePDTChange(minLockablePDT, newMinLockablePDT);
         minLockablePDT = newMinLockablePDT;
     }
 
-    /// @dev See {IBridge-changeMaxtLockablePDT}
-    function changeMaxtLockablePDT(uint256 newMaxLockablePDT) public override onlyGuardian {
-        emit MaxtLockablePDTChange(minLockablePDT, newMaxLockablePDT);
+    /// @dev See {IBridge-changeMaxLockablePDT}
+    function changeMaxLockablePDT(uint256 newMaxLockablePDT) public override onlyGuardian {
+        emit MaxLockablePDTChange(minLockablePDT, newMaxLockablePDT);
         maxLockablePDT = newMaxLockablePDT;
     }
 
@@ -240,8 +242,8 @@ contract NewKAIABridge is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrade
                 revert("PDT::Bridge: Failed to transfer amount of provision");
             }
             if (transferFail[prov.seq]++ > maxTryTransfer) {
-                setRemove(claimCandidates, prov.seq);
-                setAdd(claimFailures, prov.seq);
+                EnumerableSetUint64.setRemove(claimCandidates, prov.seq);
+                EnumerableSetUint64.setAdd(claimFailures, prov.seq);
             }
             return false;
         }
@@ -377,22 +379,22 @@ contract NewKAIABridge is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrade
 
     // @dev See {IBridge-getClaimCandidates}
     function getClaimCandidates() public override view returns (uint64[] memory) {
-        return getAll(claimCandidates);
+        return EnumerableSetUint64.getAll(claimCandidates);
     }
 
     // @dev See {IBridge-getClaimCandidatesRange}
     function getClaimCandidatesRange(uint64 range) public override view returns (uint64[] memory) {
-        return getRange(claimCandidates, range);
+        return EnumerableSetUint64.getRange(claimCandidates, range);
     }
 
     // @dev See {IBridge-getClaimFailures}
     function getClaimFailures() public override view returns (uint64[] memory) {
-        return getAll(claimFailures);
+        return EnumerableSetUint64.getAll(claimFailures);
     }
 
     // @dev See {IBridge-getClaimFailuresRange}
     function getClaimFailuresRange(uint64 range) public override view returns (uint64[] memory) {
-        return getRange(claimFailures, range);
+        return EnumerableSetUint64.getRange(claimFailures, range);
     }
 
     /// @dev Receive KLAY
@@ -402,5 +404,9 @@ contract NewKAIABridge is Initializable, ReentrancyGuardUpgradeable, UUPSUpgrade
 
     function newFunc() public pure returns (uint) {
         return 123;
+    }
+
+    function getVersion() public pure returns (string memory) {
+        return "0.0.2";
     }
 }

@@ -24,7 +24,6 @@ describe("[Upgradable Test]", function () {
   let maxTryTransfer;
 
   beforeEach(async function () {
-    upgrades.silenceWarnings()
     const [
       _operator1, _operator2, _operator3, _operator4,
       _guardian1, _guardian2, _guardian3, _guardian4, _judge1
@@ -41,14 +40,6 @@ describe("[Upgradable Test]", function () {
     minOperatorRequiredConfirm = 3;
     minGuardianRequiredConfirm = 3;
     maxTryTransfer = 0;
-
-    const accs = [operator1, operator2, operator3, operator4, guardian1, guardian2, guardian3, guardian4];
-    for (let acc of accs) {
-      await hre.network.provider.send("hardhat_setBalance", [
-        acc.address,
-        "0x1000000000000000000000000000000000000",
-      ]);
-    }
 
     const guardianFactory = await ethers.getContractFactory("Guardian");
     guardian = await upgrades.deployProxy(guardianFactory, [[
@@ -75,7 +66,7 @@ describe("[Upgradable Test]", function () {
     bridge = await upgrades.deployProxy(bridgeFactory, [
       operator.address, guardian.address, judge.address, maxTryTransfer
     ]);
- 
+
     await hre.network.provider.send("hardhat_setBalance", [
       bridge.address,
       "0x1000000000000000000000000000000000000",
@@ -109,6 +100,7 @@ describe("[Upgradable Test]", function () {
     // 1. pause the bridge
     // 2. upgrade the bridge (contract deployment and initialization)
     // 3. resume the bridge
+    // 4. send a provision tx
 
     // 1. pause
     expect(await bridge.pause()).to.equal(false);
@@ -120,15 +112,33 @@ describe("[Upgradable Test]", function () {
 
     // 2. deploy new version of contract (bridge)
     const newBridgeFactory = await ethers.getContractFactory("NewKAIABridge");
-    const newBridge = await upgrades.upgradeProxy(bridge.address, newBridgeFactory);
+    await upgrades.validateUpgrade(bridge.address, newBridgeFactory, { kind: "uups" });
+    const newBridgeImplAddr = await upgrades.deployImplementation(newBridgeFactory, [], {
+      kind: "uups"
+    });
+
+    expect(await bridge.getClaimCandidates()).to.deep.equal([1]);
+    expect(await bridge.getVersion()).to.be.equal("0.0.1");
+
+    rawTxData = (await bridge.populateTransaction.upgradeTo(newBridgeImplAddr)).data;
+    await guardian.connect(guardian1).submitTransaction(bridge.address, rawTxData, 0);
+    await guardian.connect(guardian2).confirmTransaction(3);
+    await expect(guardian.connect(guardian3).confirmTransaction(3))
+      .to.emit(bridge, "Upgraded")
+
+    expect(await bridge.getVersion()).to.be.equal("0.0.2");
+
+    const [owner] = await ethers.getSigners();
+    const newBridge = new ethers.Contract(bridge.address, newBridgeFactory.interface, owner);
+
     expect(await bridge.greatestConfirmedSeq()).to.equal(1);
     expect(await newBridge.greatestConfirmedSeq()).to.equal(1);
 
     // 3. resume the bridge
     rawTxData = (await newBridge.populateTransaction.resumeBridge("Bridge resumed")).data;
     await guardian.connect(guardian1).submitTransaction(newBridge.address, rawTxData, 0);
-    await guardian.connect(guardian2).confirmTransaction(3);
-    await guardian.connect(guardian3).confirmTransaction(3);
+    await guardian.connect(guardian2).confirmTransaction(4);
+    await guardian.connect(guardian3).confirmTransaction(4);
     expect(await newBridge.pause()).to.equal(false);
 
     // 4. make and finalize a new provision on the newly deployed bridge contract
@@ -138,6 +148,7 @@ describe("[Upgradable Test]", function () {
     await operator.connect(operator2).confirmTransaction(2);
     await operator.connect(operator3).confirmTransaction(2);
     expect(await newBridge.greatestConfirmedSeq()).to.equal(2);
+    expect(await bridge.getClaimCandidates()).to.deep.equal([1,2]);
 
     expect(await newBridge.newFunc()).to.be.equal(123);
   })
@@ -153,39 +164,75 @@ describe("[Upgradable Test]", function () {
 
     // 2. deploy new operator contract and remove one operator
     const existingOperators = await operator.getOperators();
-    const newOperatorFactory = await ethers.getContractFactory("Operator");
-    const newOperator = await upgrades.upgradeProxy(operator.address, newOperatorFactory);
-    expect(await newOperator.getOperators()).to.deep.equal(existingOperators)
 
-    rawTxData = (await newOperator.populateTransaction.removeOperator(operator2.address)).data;
-    await guardian.connect(guardian1).submitTransaction(newOperator.address, rawTxData, 0);
+    const newOperatorFactory = await ethers.getContractFactory("NewOperator");
+    await upgrades.validateUpgrade(operator.address, newOperatorFactory, { kind: "uups" });
+    const newOperatorImplAddr = await upgrades.deployImplementation(newOperatorFactory, [], {
+      kind: "uups"
+    });
+
+    expect(await operator.getVersion()).to.be.equal("0.0.1");
+
+    rawTxData = (await operator.populateTransaction.upgradeTo(newOperatorImplAddr)).data;
+    await guardian.connect(guardian1).submitTransaction(operator.address, rawTxData, 0);
     await guardian.connect(guardian2).confirmTransaction(3);
-    await guardian.connect(guardian3).confirmTransaction(3);
-    expect((await newOperator.getOperators()).length).to.equal(existingOperators.length - 1);
+    await expect(guardian.connect(guardian3).confirmTransaction(3))
+      .to.emit(operator, "Upgraded")
+
+    expect(await operator.getVersion()).to.be.equal("0.0.2");
+    expect(await operator.getOperators()).to.deep.equal(existingOperators)
+
+    rawTxData = (await operator.populateTransaction.removeOperator(operator2.address)).data;
+    await guardian.connect(guardian1).submitTransaction(operator.address, rawTxData, 0);
+    await guardian.connect(guardian2).confirmTransaction(4);
+    await guardian.connect(guardian3).confirmTransaction(4);
+    expect((await operator.getOperators()).length).to.equal(existingOperators.length - 1);
 
     // 3. resume the bridge
     rawTxData = (await bridge.populateTransaction.resumeBridge("Bridge resumed")).data;
     await guardian.connect(guardian1).submitTransaction(bridge.address, rawTxData, 0);
-    await guardian.connect(guardian3).confirmTransaction(4);
-    await guardian.connect(guardian4).confirmTransaction(4);
+    await guardian.connect(guardian3).confirmTransaction(5);
+    await guardian.connect(guardian4).confirmTransaction(5);
     expect(await bridge.pause()).to.equal(false);
   })
 
-  it("#enumerableSet upgradable test", async function () {
-    const enumSetFactory = await ethers.getContractFactory("EnumSet");
-    const enumSet = await upgrades.deployProxy(enumSetFactory, []);
+  it("#guardian contract upgrade", async function () {
+    const newGuardianFactory = await ethers.getContractFactory("NewGuardian");
+    await upgrades.validateUpgrade(guardian.address, newGuardianFactory, { kind: "uups" });
+    const newGuardianImplAddr = await upgrades.deployImplementation(newGuardianFactory, [], {
+      kind: "uups"
+    });
 
-    await enumSet.add(3);
-    await enumSet.add(4);
-    await enumSet.add(5);
-    expect(await enumSet.getAll()).to.deep.equal([3,4,5])
-    await enumSet.remove(4);
+    expect(await guardian.getVersion()).to.be.equal("0.0.1");
 
-    const newEnumSetFactory = await ethers.getContractFactory("NewEnumSet");
-    const newEnumSet = await upgrades.upgradeProxy(enumSet.address, newEnumSetFactory);
+    let rawTxData = (await guardian.populateTransaction.upgradeTo(newGuardianImplAddr)).data;
+    await expect(upgrades.upgradeProxy(guardian.address, newGuardianFactory))
+      .to.be.revertedWith("PDT::Guardian: Sender is not guardian wallet");
+    await guardian.connect(guardian1).submitTransaction(guardian.address, rawTxData, 0);
+    await guardian.connect(guardian2).confirmTransaction(2);
+    await expect(guardian.connect(guardian3).confirmTransaction(2))
+      .to.emit(guardian, "Upgraded")
 
-    expect(await newEnumSet.getAll()).to.deep.equal([3,5])
-    await enumSet.remove(5);
-    expect(await newEnumSet.getAll()).to.deep.equal([3])
-  });
+    expect(await guardian.getVersion()).to.be.equal("0.0.2");
+  })
+
+  it("#judge contract upgrade", async function () {
+    const newJudgeFactory = await ethers.getContractFactory("NewJudge");
+    await upgrades.validateUpgrade(judge.address, newJudgeFactory, { kind: "uups" });
+    const newJudgeImplAddr = await upgrades.deployImplementation(newJudgeFactory, [], {
+      kind: "uups"
+    });
+
+    expect(await guardian.getVersion()).to.be.equal("0.0.1");
+
+    let rawTxData = (await judge.populateTransaction.upgradeTo(newJudgeImplAddr)).data;
+    await expect(upgrades.upgradeProxy(judge.address, newJudgeFactory))
+      .to.be.revertedWith("PDT::Judge: Sender is not guardian wallet");
+    await guardian.connect(guardian1).submitTransaction(judge.address, rawTxData, 0);
+    await guardian.connect(guardian2).confirmTransaction(2);
+    await expect(guardian.connect(guardian3).confirmTransaction(2))
+      .to.emit(judge, "Upgraded")
+
+    expect(await judge.getVersion()).to.be.equal("0.0.2");
+  })
 })

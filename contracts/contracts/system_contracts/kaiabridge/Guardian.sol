@@ -21,10 +21,9 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "./ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./IGuardian.sol";
 
-contract Guardian is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable, OwnableUpgradeable, IERC165, IGuardian {
+contract Guardian is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable, IERC165, IGuardian {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() { _disableInitializers(); }
 
@@ -35,7 +34,7 @@ contract Guardian is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable,
         public
         initializer
     {
-        __ReentrancyGuard_init();
+
         for (uint8 i=0; i<initGuardians.length; i++) {
             guardians.push(initGuardians[i]);
             isGuardian[initGuardians[i]] = true;
@@ -45,11 +44,11 @@ contract Guardian is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable,
         // Fill the first index(0) with dummy tx
         addTransaction(address(0), "", 0);
 
-        __Ownable_init();
         __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
     }
 
-    function _authorizeUpgrade(address newImplementation) internal virtual override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal virtual override onlyGuardian {}
 
     function supportsInterface(bytes4 interfaceId) external override pure returns (bool) {
         return interfaceId == type(IGuardian).interfaceId;
@@ -321,5 +320,10 @@ contract Guardian is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable,
             executedTxs[i] = _executedTxs[i];
         }
         return (pendingTxs, executedTxs);
+    }
+
+    /// @dev Return a contract version
+    function getVersion() public pure returns (string memory) {
+        return "0.0.1";
     }
 }

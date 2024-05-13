@@ -18,9 +18,9 @@
 pragma solidity 0.8.24;
 
 import "./IBridge.sol";
-import "./EnumerableSetUpgradable.sol";
+import "./EnumerableSetUint64.sol";
 
-abstract contract IOperator is EnumerableSetUpgradable {
+abstract contract IOperator {
     //////////////////// Struct ////////////////////
     struct Transaction {
         address to;

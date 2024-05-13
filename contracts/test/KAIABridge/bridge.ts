@@ -84,19 +84,25 @@ describe("[Bridge Test]", function () {
     bridge = await upgrades.deployProxy(bridgeFactory, [
       operator.address, guardian.address, judge.address, maxTryTransfer
     ]);
- 
+
     await hre.network.provider.send("hardhat_setBalance", [
       bridge.address,
       "0x1000000000000000000000000000000000000",
     ]);
-    
+
     // contract initialization
     let rawTxData = (await operator.populateTransaction.changeBridge(bridge.address)).data;
     await guardian.connect(guardian1).submitTransaction(operator.address, rawTxData, 0);
     await guardian.connect(guardian2).confirmTransaction(1);
     await expect(guardian.connect(guardian3).confirmTransaction(1))
       .to.emit(operator, "ChangeBridge");
-    guardianTxID = 2;
+
+    rawTxData = (await bridge.populateTransaction.changeTransferEnable(true)).data;
+    await guardian.connect(guardian1).submitTransaction(bridge.address, rawTxData, 0);
+    await guardian.connect(guardian2).confirmTransaction(2);
+    await expect(guardian.connect(guardian3).confirmTransaction(2))
+      .to.emit(bridge, "TransferFromKaiaOnOffChanged");
+    guardianTxID = 3;
 
     sender = "0x0000000000000000000000000000000000000123";
     receiver = "0x0000000000000000000000000000000000000456";
@@ -400,7 +406,7 @@ describe("[Bridge Test]", function () {
 
     // `transfer()` is not available after paused
     await expect(bridge.transfer(fnsaReceiver, {value: await bridge.minLockablePDT()}))
-      .to.revertedWith("PDT::Manager: Bridge has been paused");
+      .to.revertedWith("PDT::Bridge: Bridge has been paused");
   });
 
   it("#bridge pause - provision is not available", async function () {
@@ -414,7 +420,7 @@ describe("[Bridge Test]", function () {
     await operator.connect(operator1).submitTransaction(bridge.address, rawTxData, 0);
     await operator.connect(operator2).confirmTransaction(1);
     await expect(operator.connect(operator3).confirmTransaction(1))
-      .to.revertedWith("PDT::Manager: Bridge has been paused");
+      .to.revertedWith("PDT::Bridge: Bridge has been paused");
   });
 
   it("#bridge pause - resume", async function () {
@@ -430,7 +436,7 @@ describe("[Bridge Test]", function () {
     await operator.connect(operator1).submitTransaction(bridge.address, rawTxData, 0);
     await operator.connect(operator2).confirmTransaction(1);
     await expect(operator.connect(operator3).confirmTransaction(1))
-      .to.revertedWith("PDT::Manager: Bridge has been paused");
+      .to.revertedWith("PDT::Bridge: Bridge has been paused");
 
     // resume
     rawTxData = (await bridge.populateTransaction.resumeBridge("Bridge resumed")).data;
@@ -925,27 +931,27 @@ describe("[Bridge Test]", function () {
   });
 
   it("#change minimum lockable PDT", async function () {
-    const newMintLockablePDT = BigInt((await bridge.PDT_UNIT()) * 2);
-    expect(await bridge.minLockablePDT()).to.not.equal(newMintLockablePDT);
+    const newMinLockablePDT = BigInt((await bridge.PDT_UNIT()) * 2);
+    expect(await bridge.minLockablePDT()).to.not.equal(newMinLockablePDT);
 
-    let rawTxData = (await bridge.populateTransaction.changeMintLockablePDT(newMintLockablePDT)).data;
+    let rawTxData = (await bridge.populateTransaction.changeMinLockablePDT(newMinLockablePDT)).data;
     await guardian.connect(guardian1).submitTransaction(bridge.address, rawTxData, 0);
     await guardian.connect(guardian2).confirmTransaction(guardianTxID);
     await guardian.connect(guardian3).confirmTransaction(guardianTxID);
 
-    expect(await bridge.minLockablePDT()).to.equal(newMintLockablePDT);
+    expect(await bridge.minLockablePDT()).to.equal(newMinLockablePDT);
   });
 
   it("#change maximum lockable PDT", async function () {
-    const newMaxtLockablePDT = BigInt((await bridge.PDT_UNIT()) * 200);
-    expect(await bridge.maxLockablePDT()).to.not.equal(newMaxtLockablePDT);
+    const newMaxLockablePDT = BigInt((await bridge.PDT_UNIT()) * 200);
+    expect(await bridge.maxLockablePDT()).to.not.equal(newMaxLockablePDT);
 
-    let rawTxData = (await bridge.populateTransaction.changeMaxtLockablePDT(newMaxtLockablePDT)).data;
+    let rawTxData = (await bridge.populateTransaction.changeMaxLockablePDT(newMaxLockablePDT)).data;
     await guardian.connect(guardian1).submitTransaction(bridge.address, rawTxData, 0);
     await guardian.connect(guardian2).confirmTransaction(guardianTxID);
     await guardian.connect(guardian3).confirmTransaction(guardianTxID);
 
-    expect(await bridge.maxLockablePDT()).to.equal(newMaxtLockablePDT);
+    expect(await bridge.maxLockablePDT()).to.equal(newMaxLockablePDT);
   });
 
   it("#change maxTryTransfer", async function () {
@@ -1090,7 +1096,7 @@ describe("[Bridge Test]", function () {
     await setBlockTimestamp(setTime);
 
     const gasSmall = 300000;
-    for (let i=0; i<=maxTryTransfer; i++) {
+    for (let i=0; i<maxTryTransfer; i++) {
       await bridge.requestBatchClaim(1, {gasLimit: gasSmall})
       expect(await bridge.transferFail(seq)).to.equal(i + 1);
       expect(await bridge.getClaimFailures()).to.deep.equal([])

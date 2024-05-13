@@ -21,11 +21,10 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "./ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./IGuardian.sol";
 import "./IJudge.sol";
 
-contract Judge is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable, OwnableUpgradeable, IERC165, IJudge {
+contract Judge is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable, IERC165, IJudge {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() { _disableInitializers(); }
 
@@ -37,7 +36,6 @@ contract Judge is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable, Ow
         public
         initializer
     {
-        __ReentrancyGuard_init();
         require(IERC165(initGuardian).supportsInterface(type(IGuardian).interfaceId), "PDT::Judge: Guardian contract address does not implement IGuardian");
 
         for (uint8 i=0; i<initJudges.length; i++) {
@@ -50,11 +48,11 @@ contract Judge is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable, Ow
         // Fill the first index(0) with dummy tx
         addTransaction(address(0), "", 0);
 
-        __Ownable_init();
         __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
     }
 
-    function _authorizeUpgrade(address newImplementation) internal virtual override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal virtual override onlyGuardian {}
 
     function supportsInterface(bytes4 interfaceId) external override pure returns (bool) {
         return interfaceId == type(IJudge).interfaceId;
@@ -336,5 +334,10 @@ contract Judge is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable, Ow
             executedTxs[i] = _executedTxs[i];
         }
         return (pendingTxs, executedTxs);
+    }
+
+    /// @dev Return a contract version
+    function getVersion() public pure returns (string memory) {
+        return "0.0.1";
     }
 }
